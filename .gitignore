@@ -1,0 +1,5 @@
+.vscode/
+circuitpy/
+lib/
+
+*.code-workspace
