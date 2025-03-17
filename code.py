@@ -7,7 +7,15 @@ from adafruit_display_text import label
 import adafruit_displayio_sh1107
 import busio
 import digitalio
+import time
 from analogio import AnalogIn
+import usb_midi
+import adafruit_midi
+from adafruit_midi.note_on import NoteOn
+from adafruit_midi.note_off import NoteOff
+from adafruit_midi.pitch_bend import PitchBend
+from adafruit_midi.control_change import ControlChange
+
 
 # Constants and menu constants
 # IO ports (menu buttons)
@@ -37,21 +45,21 @@ button_sel.pull = digitalio.Pull.UP
 # mod_in = AnalogIn(board.A1)
 # bend_in = AnalogIn(board.A2)
 
-# # IO ports (note scanning)
-# row_s0 = digitalio.DigitalInOut(board.GP10)
-# row_s0.direction = digitalio.Direction.OUTPUT
-# row_s1 = digitalio.DigitalInOut(board.GP11)
-# row_s1.direction = digitalio.Direction.OUTPUT
-# row_s2 = digitalio.DigitalInOut(board.GP12)
-# row_s2.direction = digitalio.Direction.OUTPUT
-# col_s0 = digitalio.DigitalInOut(board.GP6)
-# col_s0.direction = digitalio.Direction.OUTPUT
-# col_s1 = digitalio.DigitalInOut(board.GP7)
-# col_s1.direction = digitalio.Direction.OUTPUT
-# col_s2 = digitalio.DigitalInOut(board.GP8)
-# col_s2.direction = digitalio.Direction.OUTPUT
-# scan_in = digitalio.DigitalInOut(board.GP17)
-# scan_in.direction = digitalio.Direction.INPUT
+# IO ports (note scanning)
+row_s0 = digitalio.DigitalInOut(board.GP10)
+row_s0.direction = digitalio.Direction.OUTPUT
+row_s1 = digitalio.DigitalInOut(board.GP11)
+row_s1.direction = digitalio.Direction.OUTPUT
+row_s2 = digitalio.DigitalInOut(board.GP12)
+row_s2.direction = digitalio.Direction.OUTPUT
+col_s0 = digitalio.DigitalInOut(board.GP6)
+col_s0.direction = digitalio.Direction.OUTPUT
+col_s1 = digitalio.DigitalInOut(board.GP7)
+col_s1.direction = digitalio.Direction.OUTPUT
+col_s2 = digitalio.DigitalInOut(board.GP8)
+col_s2.direction = digitalio.Direction.OUTPUT
+scan_in = digitalio.DigitalInOut(board.GP17)
+scan_in.direction = digitalio.Direction.INPUT
 
 # Menu constants
 len_main = 3
@@ -144,6 +152,7 @@ scale_map = [
 ]
 
 # MIDI constants
+num_notes = 36
 current_octave = 0
 max_octave = 3
 min_octave = -3
@@ -152,6 +161,10 @@ last_octave_down = 0
 last_sustain = 0
 last_mod = 0;
 last_bend = 0;
+note_active = [0 for i in range(num_notes)]
+midi_offset = 48
+num_rows = 3
+num_cols = 3
 
 # Set up the display
 WIDTH = 128
@@ -164,6 +177,8 @@ display_bus = displayio.I2CDisplay(i2c, device_address=0x3C)
 display = adafruit_displayio_sh1107.SH1107(display_bus, width=WIDTH, height=HEIGHT)
 display.rotation = 180
 
+# Set up MIDI
+midi = adafruit_midi.MIDI(midi_out=usb_midi.ports[1], out_channel=state_channel)
 
 # Menu functions
 def get_window(this_menu, this_pointer):
@@ -331,6 +346,57 @@ def test_menu_buttons():
   if button_bck.value==1 and last_button_state[3]==1:
     last_button_state[3] = 0  
 
+# MIDI functions
+
+def getNote(note):
+  pitch = note + midi_offset
+  pitch = pitch + state_tune
+  pitch = pitch + (12 * state_octave)
+  return pitch
+
+def playNote(in_pitch):
+  midi.send(NoteOn(getNote(in_pitch), state_velocity))
+  print(f"Sending note {getNote(in_pitch)} at velocity {state_velocity}")
+
+def releaseNote(in_pitch):
+  midi.send(NoteOff(getNote(in_pitch), 0))
+  print(f"Releasing note: {getNote(in_pitch)}")
+
+def testScale(note):
+  if scale_map[state_scale][note] == 1:
+    playNote(note)
+  elif scale_map[state_scale][note] == 0 and note_active[note] == 1:
+    releaseNote(note)
+
+
+def test_scan( cell):
+  # Read input
+  current_note = scan_in.value;
+  if (current_note==1 and note_active[cell]==0):
+    note_active[cell] = current_note
+    testScale(cell)
+  
+  elif (current_note==0 and note_active[cell]==1):
+    note_active[cell] = current_note
+    releaseNote(cell)
+  
+def selectMuxChannel(s0, s1, s2, mux):
+  s0.value = (mux & 0x01) > 0  # Set LSB
+  s1.value = (mux & 0x02) > 0  # Set second bit
+  s2.value = (mux & 0x04) > 0  # Set third bit
+
+def scanMatrix():
+  for row in range(0,num_rows):
+    selectMuxChannel(row_s0, row_s1, row_s2, row)
+    time.sleep(0.001)
+    for col in range(0,num_cols):
+      selectMuxChannel(col_s0, col_s1, col_s2, col);
+      time.sleep(0.001)
+      test_scan(col*6 + row);
+
+
+
 set_main_menu()
 while True:
   test_menu_buttons()
+  scanMatrix()
