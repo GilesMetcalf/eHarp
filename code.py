@@ -16,7 +16,6 @@ from adafruit_midi.note_off import NoteOff
 from adafruit_midi.pitch_bend import PitchBend
 from adafruit_midi.control_change import ControlChange
 
-
 # Constants and menu constants
 # IO ports (menu buttons)
 button_up = digitalio.DigitalInOut(board.GP2)
@@ -32,18 +31,18 @@ button_sel = digitalio.DigitalInOut(board.GP1)
 button_sel.direction = digitalio.Direction.INPUT
 button_sel.pull = digitalio.Pull.UP
 
-# # IO ports (MIDI controls)
-# button_oct_up = digitalio.DigitalInOut(board.GP16)
-# button_oct_up.direction = digitalio.Direction.INPUT
-# button_oct_up.pull = digitalio.Pull.UP
-# button_oct_dn = digitalio.DigitalInOut(board.GP17)
-# button_oct_dn.direction = digitalio.Direction.INPUT
-# button_oct_dn.pull = digitalio.Pull.UP
-# button_oct_stn = digitalio.DigitalInOut(board.GP18)
-# button_oct_stn.direction = digitalio.Direction.INPUT
-# button_oct_stn.pull = digitalio.Pull.UP
-# mod_in = AnalogIn(board.A1)
-# bend_in = AnalogIn(board.A2)
+# IO ports (MIDI controls)
+button_oct_up = digitalio.DigitalInOut(board.GP22)
+button_oct_up.direction = digitalio.Direction.INPUT
+button_oct_up.pull = digitalio.Pull.UP
+button_oct_dn = digitalio.DigitalInOut(board.GP21)
+button_oct_dn.direction = digitalio.Direction.INPUT
+button_oct_dn.pull = digitalio.Pull.UP
+button_stn = digitalio.DigitalInOut(board.GP19)
+button_stn.direction = digitalio.Direction.INPUT
+button_stn.pull = digitalio.Pull.UP
+mod_in = AnalogIn(board.A1)
+bend_in = AnalogIn(board.A2)
 
 # IO ports (note scanning)
 row_s0 = digitalio.DigitalInOut(board.GP10)
@@ -82,7 +81,7 @@ state_scale = 0
 state_tune = 6
 state_channel = 1
 state_octave = 0
-state_velocity = 64
+state_velocity = 6
 
 # Menus
 main_menu = [
@@ -118,11 +117,11 @@ scales = [
   "Phrygian"
 ]
 
-tuning = [-6, -5, -4, -3, -2, -1, 0, 1, 2, 3, 4, 5, 6]
+tuning = ["-6", "-5", "-4", "-3", "-2", "-1", "0", "1", "2", "3", "4", "5", "6"]
 
-channel = [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10]
+channel = ["0", "1", "2", "3", "4", "5", "6", "7", "8", "9", "10"]
 
-velocity = [8, 16, 24, 32, 48, 64, 80, 96, 112, 127]
+velocity = ["8", "16", "24", "32", "48", "64","72", "80", "96", "112", "127"]
 
 # Mapping scales
 scale_map = [
@@ -159,12 +158,13 @@ min_octave = -3
 last_octave_up = 0
 last_octave_down = 0
 last_sustain = 0
-last_mod = 0;
-last_bend = 0;
+last_mod = 0
+last_bend = 0
 note_active = [0 for i in range(num_notes)]
 midi_offset = 48
 num_rows = 3
 num_cols = 3
+ignore_jitter = 500
 
 # Set up the display
 WIDTH = 128
@@ -182,16 +182,14 @@ midi = adafruit_midi.MIDI(midi_out=usb_midi.ports[1], out_channel=state_channel)
 
 # Menu functions
 def get_window(this_menu, this_pointer):
-  window = []
   item_count = len(this_menu)
   this_pointer = max(0, min(this_pointer, item_count - 1))
   start = (this_pointer // display_window) * display_window
   end = min(start + display_window, item_count)
-  print(f"Pointer: {this_pointer}")
-  print(f"Start: {start}, End: {end}")
-  return start, end, this_menu[start:end]
+  return start, end
 
 def show_menu(menu, pointer):
+  global current_top
   menu_group = displayio.Group(x=15, y=-10)
   if menu == 0 :
     working_menu = main_menu
@@ -203,11 +201,11 @@ def show_menu(menu, pointer):
     working_menu = channel
   elif menu == 4 :
     working_menu = velocity
-  start, end, window = get_window(working_menu, pointer)
+  start, end = get_window(working_menu, pointer)
 
-  for i in range(0, len(window)):
-    y_pos = 20 + (i * 12)
-    if (i+start) == pointer:
+  for i in range(start, end):
+    y_pos = 20 + ((i-start) * 12)
+    if i == pointer:
       bg_width = len(working_menu[i]) * 7
       bg_bitmap = displayio.Bitmap(bg_width, 10, 2)
       bg_palette = displayio.Palette(2)
@@ -232,7 +230,6 @@ def set_scale_menu():
   global current_menu, current_pointer, state_menu
   current_menu = 1
   current_pointer = state_scale
-  # current_pointer = 14
   state_menu = 1
   show_menu(current_menu, current_pointer)
 
@@ -259,33 +256,26 @@ def set_velocity_menu():
 
 # Menu control handling
 def select_item():
+  global state_scale, state_tune, state_channel, state_velocity
   # Menu logic
   if current_menu==0:
     if current_pointer==0:  # Main menu -> Scales
       set_scale_menu()
-      # menu_scales(current_pointer)
     if current_pointer==1:  # Main menu -> Tuning
       set_tune_menu()
-      # menu_tune(current_pointer)
     if current_pointer==2: # Main menu -> MIDI channel
       set_midi_menu()
-      # menu_midi(current_pointer)
     if current_pointer==3: # Main menu -> Velocity
       set_velocity_menu()
-      # menu_midi(current_pointer)
    
   if current_menu==1:
     state_scale = current_pointer
-    print(f"Currently selected item: {scales[state_scale]}")
   if current_menu==2:
     state_tune = current_pointer
-    print(f"Currently selected item: {tuning[state_tune]}")
   if current_menu==3:
-    state_channel = current_pointer
-    print(f"Currently selected item: {channel[state_channel]}")
+     state_channel = current_pointer
   if current_menu==4:
     state_velocity = current_pointer
-    print(f"Currently selected item: {velocity[state_velocity]}")
   
 def  back_to_main():
   set_main_menu()
@@ -308,7 +298,6 @@ def step_up():
   if current_menu==4:
     if current_pointer>len(velocity):
       current_pointer = len(velocity)-1
-  print(f"Pointer is now {current_pointer}")
   show_menu(current_menu, current_pointer)
 
 def step_down():
@@ -316,16 +305,14 @@ def step_down():
   current_pointer = current_pointer - 1
   if current_pointer<0:
     current_pointer = 0
-  print(f"Pointer is now {current_pointer}")
   show_menu(current_menu, current_pointer)
 
 def test_menu_buttons():
+  global last_button_state
   if button_up.value==0 and last_button_state[0]==0:
-    print("Up")
     last_button_state[0] = 1
     step_up()
   if button_dn.value==0 and last_button_state[1]==0:
-    print("Down")
     last_button_state[1] = 1
     step_down()
   if button_sel.value==0 and last_button_state[2]==0:
@@ -347,20 +334,27 @@ def test_menu_buttons():
     last_button_state[3] = 0  
 
 # MIDI functions
+def get_tuning():
+  return int(tuning[state_tune])
+
+def get_velocity():
+  return int(velocity[state_velocity])
+
+def get_channel():
+  return int(channel[state_channel])-1
 
 def getNote(note):
   pitch = note + midi_offset
-  pitch = pitch + state_tune
+  pitch = pitch + get_tuning()
   pitch = pitch + (12 * state_octave)
   return pitch
 
 def playNote(in_pitch):
-  midi.send(NoteOn(getNote(in_pitch), state_velocity))
-  print(f"Sending note {getNote(in_pitch)} at velocity {state_velocity}")
+  if next_cycle == 1:
+    midi.send(NoteOn(getNote(in_pitch), get_velocity()), get_channel())
 
 def releaseNote(in_pitch):
-  midi.send(NoteOff(getNote(in_pitch), 0))
-  print(f"Releasing note: {getNote(in_pitch)}")
+  midi.send(NoteOff(getNote(in_pitch), 0), get_channel())
 
 def testScale(note):
   if scale_map[state_scale][note] == 1:
@@ -368,10 +362,22 @@ def testScale(note):
   elif scale_map[state_scale][note] == 0 and note_active[note] == 1:
     releaseNote(note)
 
+def sustainOn():
+  midi.send(ControlChange(64, 127), get_channel())
+
+def sustainOff():
+  midi.send(ControlChange(64, 0), get_channel())
+
+def modChange(mod):
+  midi.send(ControlChange(1, mod), get_channel())
+
+def bend(bend_val):
+  midi.send(PitchBend(int(bend_val)), get_channel())
 
 def test_scan( cell):
+  global note_active
   # Read input
-  current_note = scan_in.value;
+  current_note = scan_in.value
   if (current_note==1 and note_active[cell]==0):
     note_active[cell] = current_note
     testScale(cell)
@@ -390,13 +396,56 @@ def scanMatrix():
     selectMuxChannel(row_s0, row_s1, row_s2, row)
     time.sleep(0.001)
     for col in range(0,num_cols):
-      selectMuxChannel(col_s0, col_s1, col_s2, col);
+      selectMuxChannel(col_s0, col_s1, col_s2, col)
       time.sleep(0.001)
-      test_scan(col*6 + row);
+      test_scan(col*6 + row)
 
+def test_midi_controls():
+  global last_octave_up, last_octave_down, last_bend, last_mod, last_sustain
+  global current_octave, state_octave
+  current_octave_button_up = button_oct_up.value
+  if last_octave_up == 0 and current_octave_button_up == 0:
+    current_octave = current_octave + 1
+    if current_octave > max_octave:
+      current_octave = max_octave
+    state_octave = current_octave
+    last_octave_up = 1
+  if last_octave_up == 1 and current_octave_button_up == 1:
+    last_octave_up = 0
+  
+  current_octave_button_dn = button_oct_dn.value
+  if last_octave_down == 0 and current_octave_button_dn == 0:
+    current_octave=  current_octave - 1
+    if current_octave < min_octave:
+      current_octave = min_octave
+    state_octave = current_octave
+    last_octave_down = 1
+  if last_octave_down == 1 and current_octave_button_dn == 1:
+    last_octave_down = 0
 
+  current_sustain = button_stn.value
+  if last_sustain == 0 and current_sustain == 0:
+    sustainOn()
+    last_sustain = 1
+  if last_sustain == 1 and current_sustain == 1:
+    sustainOff()
+    last_sustain = 0
+
+  # Read pots and send mod / bend commands
+  mod_value = 32768 - (mod_in.value/2)
+  if (mod_value != last_mod) and abs(mod_value - last_mod) > ignore_jitter:
+    last_mod = mod_value
+    conv_mod_value = int(abs(mod_value - 16384)/128)
+    modChange(conv_mod_value)
+  bend_value = int(32768 - (bend_in.value/2))
+  if (bend_value != last_bend) and abs(bend_value - last_bend) > ignore_jitter:
+    last_bend = bend_value
+    bend(bend_value/2)
 
 set_main_menu()
+next_cycle = 0
 while True:
   test_menu_buttons()
   scanMatrix()
+  test_midi_controls()
+  next_cycle = 1  # Ignore note generation for the first cycle
