@@ -395,7 +395,7 @@ def scanMatrix():
     for col in range(1,num_cols):
       selectMuxChannel(col_s0, col_s1, col_s2, col)
       time.sleep(0.001)
-      test_scan(col*6 + row)
+      test_scan((col-1)*6 + (row-1))
 
 def test_midi_controls():
   global last_octave_up, last_octave_down, last_bend, last_mod, last_sustain
