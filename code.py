@@ -67,13 +67,10 @@ len_tuning = 13
 len_channel = 11
 display_window = 10
 current_top = 0
-# max_top = 0
 current_menu = 0
 current_pointer = 0
-# num_buttons = 4
 button_pressed = [0,0,0,0]
 last_button_state = [0,0,0,0]
-# menu_buttons = [button_up, button_dn, button_sel, button_bck]
 
 # State values
 state_menu = 0
@@ -162,8 +159,8 @@ last_mod = 0
 last_bend = 0
 note_active = [0 for i in range(num_notes)]
 midi_offset = 48
-num_rows = 3
-num_cols = 3
+num_rows = 6
+num_cols = 6
 ignore_jitter = 500
 
 # Set up the display
