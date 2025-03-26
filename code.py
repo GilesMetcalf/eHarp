@@ -389,10 +389,10 @@ def selectMuxChannel(s0, s1, s2, mux):
   s2.value = (mux & 0x04) > 0  # Set third bit
 
 def scanMatrix():
-  for row in range(0,num_rows):
+  for row in range(1,num_rows):
     selectMuxChannel(row_s0, row_s1, row_s2, row)
     time.sleep(0.001)
-    for col in range(0,num_cols):
+    for col in range(1,num_cols):
       selectMuxChannel(col_s0, col_s1, col_s2, col)
       time.sleep(0.001)
       test_scan(col*6 + row)
