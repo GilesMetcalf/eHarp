@@ -158,6 +158,7 @@ last_sustain = 0
 last_mod = 0
 last_bend = 0
 note_active = [0 for i in range(num_notes)]
+note_valid = [1 for i in range(num_notes)]
 midi_offset = 48
 num_rows = 6
 num_cols = 6
@@ -373,15 +374,17 @@ def bend(bend_val):
 
 def test_scan( cell):
   global note_active
-  # Read input
-  current_note = scan_in.value
-  if (current_note==1 and note_active[cell]==0):
-    note_active[cell] = current_note
-    testScale(cell)
-  
-  elif (current_note==0 and note_active[cell]==1):
-    note_active[cell] = current_note
-    releaseNote(cell)
+  # Test for valid cell (valid LDR)
+  if note_valid[cell] == 1:
+    # Read input
+    current_note = scan_in.value
+    if (current_note==1 and note_active[cell]==0):
+      note_active[cell] = current_note
+      testScale(cell)
+    
+    elif (current_note==0 and note_active[cell]==1):
+      note_active[cell] = current_note
+      releaseNote(cell)
   
 def selectMuxChannel(s0, s1, s2, mux):
   s0.value = (mux & 0x01) > 0  # Set LSB
@@ -396,6 +399,21 @@ def scanMatrix():
       selectMuxChannel(col_s0, col_s1, col_s2, col)
       time.sleep(0.001)
       test_scan((col-1)*6 + (row-1))
+
+def testLDRs():
+  global note_valid
+    # Loop three times around the LDR array and look for blocked/non-working sensors
+  for _ in range(3):
+    for row in range(1,num_rows):
+      selectMuxChannel(row_s0, row_s1, row_s2, row)
+      time.sleep(0.001)
+      for col in range(1,num_cols):
+        selectMuxChannel(col_s0, col_s1, col_s2, col)
+        time.sleep(0.001)
+        cell = ((col-1)*6 + (row-1))
+        current_sensor = scan_in.value
+        if current_sensor == 1:   # Laser is not reaching the sensor
+          note_valid[cell] = 0    # Mark the note as dead
 
 def test_midi_controls():
   global last_octave_up, last_octave_down, last_bend, last_mod, last_sustain
@@ -441,6 +459,7 @@ def test_midi_controls():
 
 set_main_menu()
 next_cycle = 0
+testLDRs()
 while True:
   test_menu_buttons()
   scanMatrix()
