@@ -17,7 +17,10 @@ from adafruit_midi.note_off import NoteOff
 from adafruit_midi.pitch_bend import PitchBend
 from adafruit_midi.control_change import ControlChange
 
-# Constants and menu constants
+# +------------------------------+
+# | Constants and menu constants |
+# +------------------------------+
+
 # IO ports (menu buttons)
 button_up = digitalio.DigitalInOut(board.GP2)
 button_up.direction = digitalio.Direction.INPUT
@@ -60,17 +63,22 @@ col_s2 = digitalio.DigitalInOut(board.GP8)
 col_s2.direction = digitalio.Direction.OUTPUT
 scan_in = digitalio.DigitalInOut(board.GP17)
 scan_in.direction = digitalio.Direction.INPUT
+lsr_enbl = digitalio.DigitalInOut(board.GP9)
+lsr_enbl.direction = digitalio.Direction.OUTPUT
 
+# TODO: Review these - may not be needed if digital input used for laser detection.
 # Scanning constants
-laser_read_in = analogio.AnalogIn(board.A3)
-laser_samples = 5  # Scan 5 times and average
-laser_positive_threshold = 0.9  # Minimum threshold for positive reading (90% of sampled value)
-laser_read_scale = 1023
-v_ref_scale = 65535
-ground_value = 40000  # Mid-range default for v_ref correction
-ground_jitter = 200   # Allowable error for v_ref correction
-v_ref_out = pwmio.PWMOut(board.A4, frequency=5000, duty_cycle=ground_value)
+calibration_scans = 10 
+note_on_logic = 0 # input value for "on" note
 
+# laser_read_in = analogio.AnalogIn(board.A3)
+# laser_samples = 5  # Scan 5 times and average
+# laser_positive_threshold = 0.9  # Minimum threshold for positive reading (90% of sampled value)
+# laser_read_scale = 1023
+# v_ref_scale = 65535
+# ground_value = 40000  # Mid-range default for v_ref correction
+# ground_jitter = 200   # Allowable error for v_ref correction
+# v_ref_out = pwmio.PWMOut(board.A4, frequency=5000, duty_cycle=ground_value)
 
 # Menu constants
 len_main = 3
@@ -91,13 +99,15 @@ state_tune = 6
 state_channel = 1
 state_octave = 0
 state_velocity = 6
+# state_system = 0
 
 # Menus
 main_menu = [
   "Scale / mode",
   "Tuning",
   "MIDI channel",
-  "Velocity"
+  "Velocity",
+  "System"
 ]
 
 scales = [
@@ -131,6 +141,8 @@ tuning = ["-6", "-5", "-4", "-3", "-2", "-1", "0", "1", "2", "3", "4", "5", "6"]
 channel = ["0", "1", "2", "3", "4", "5", "6", "7", "8", "9", "10"]
 
 velocity = ["8", "16", "24", "32", "48", "64","72", "80", "96", "112", "127"]
+
+system_menu = ["Calibration","SlowScan"]
 
 # Mapping scales
 scale_map = [
@@ -176,8 +188,9 @@ num_rows = 6
 num_cols = 6
 ignore_jitter = 500
 
+# TODO: Review these - may not be needed if digital input used for laser detection.
 # Array for laser threshold values
-laser_threshold = [0 for i in range(num_notes)]
+# laser_threshold = [0 for i in range(num_notes)]
 
 # Set up the display
 WIDTH = 128
@@ -189,13 +202,31 @@ i2c = busio.I2C(board.GP5, board.GP4)  # Update pins if needed
 display_bus = displayio.I2CDisplay(i2c, device_address=0x3C)
 display = adafruit_displayio_sh1107.SH1107(display_bus, width=WIDTH, height=HEIGHT)
 display.rotation = 180
+splash_time = 10  # Splashscreen display time
 
-next_cycle = 0
+output_enable = False
+slow_scan_count = 5   # number of cycles for slow scan
+slow_scan_speed = 0.5 # number of seconds for each step in slow scan
 
 # Set up MIDI
 midi = adafruit_midi.MIDI(midi_out=usb_midi.ports[1], out_channel=state_channel)
 
-# Menu functions
+
+# +----------------------------+
+# | Menu and display functions |
+# +----------------------------+
+
+def show_splash():
+  splash_group = displayio.Group()
+  bitmap = displayio.OnDiskBitmap("/logo.bmp")
+  tile_grid = displayio.TileGrid(
+      bitmap,
+      pixel_shader=bitmap.pixel_shader
+  )
+  splash_group.append(tile_grid)
+  display.root_group = splash_group
+  time.sleep(splash_time)
+
 def get_window(this_menu, this_pointer):
   item_count = len(this_menu)
   this_pointer = max(0, min(this_pointer, item_count - 1))
@@ -216,6 +247,8 @@ def show_menu(menu, pointer):
     working_menu = channel
   elif menu == 4 :
     working_menu = velocity
+  elif menu == 5 :
+    working_menu = system_menu
   start, end = get_window(working_menu, pointer)
 
   for i in range(start, end):
@@ -269,9 +302,18 @@ def set_velocity_menu():
   state_menu = 4
   show_menu(current_menu, current_pointer)
 
+def set_system_menu():
+  global current_menu, current_pointer, state_menu
+  current_menu = 5
+  current_pointer = 0
+  state_menu = 5
+  show_menu(current_menu, current_pointer)
+
 # Menu control handling
 def select_item():
-  global state_scale, state_tune, state_channel, state_velocity
+  global state_scale, state_tune, state_channel, state_velocity, state_system, output_enable
+  # print(current_menu," - ",current_pointer)
+
   # Menu logic
   if current_menu==0:
     if current_pointer==0:  # Main menu -> Scales
@@ -282,7 +324,9 @@ def select_item():
       set_midi_menu()
     if current_pointer==3: # Main menu -> Velocity
       set_velocity_menu()
-   
+    if current_pointer==4: # Main menu -> System
+      set_system_menu()   
+
   if current_menu==1:
     state_scale = current_pointer
   if current_menu==2:
@@ -291,7 +335,15 @@ def select_item():
      state_channel = current_pointer
   if current_menu==4:
     state_velocity = current_pointer
-  
+  if current_menu==5:
+    state_system = current_pointer
+    if current_pointer==0:  # Calibration
+      output_enable = False
+      checkForValidNotes()
+      output_enable = True
+    elif current_pointer==1:  # Slow scan
+      slow_scan()
+
 def  back_to_main():
   set_main_menu()
 
@@ -313,6 +365,9 @@ def step_up():
   if current_menu==4:
     if current_pointer>len(velocity):
       current_pointer = len(velocity)-1
+  if current_menu==5:
+    if current_pointer>len(system_menu):
+      current_pointer = len(system_menu)-1
   show_menu(current_menu, current_pointer)
 
 def step_down():
@@ -348,7 +403,14 @@ def test_menu_buttons():
   if button_bck.value==1 and last_button_state[3]==1:
     last_button_state[3] = 0  
 
-# MIDI functions
+
+
+
+
+# +----------------+
+# | MIDI functions |
+# +----------------+
+
 def get_tuning():
   return int(tuning[state_tune])
 
@@ -365,7 +427,7 @@ def getNote(note):
   return pitch
 
 def playNote(in_pitch):
-  if next_cycle == 1:
+  if output_enable:
     midi.send(NoteOn(getNote(in_pitch), get_velocity()), get_channel())
 
 def releaseNote(in_pitch):
@@ -389,6 +451,68 @@ def modChange(mod):
 def bend(bend_val):
   midi.send(PitchBend(int(bend_val)), get_channel())
 
+
+
+# +----------------------+
+# | Laser scan functions |
+# +----------------------+
+
+# OK, lets start again here!
+
+def selectMuxChannel(s0, s1, s2, mux):
+  s0.value = (mux & 0x01) > 0  # Set LSB
+  s1.value = (mux & 0x02) > 0  # Set second bit
+  s2.value = (mux & 0x04) > 0  # Set third bit
+
+def checkForValidNotes():
+  global note_valid
+    # Loop around the array and look for blocked/non-working lasers
+    # Non-working notes will be ignored in scans so that they don't play continuously.
+  for _ in range(calibration_scans):
+    for col in range(0,num_cols):
+      for row in range(0,num_rows):
+        cell = col*6 + row
+        lsr_enbl.value = 0
+        selectMuxChannel(row_s0, row_s1, row_s2, row)
+        selectMuxChannel(col_s0, col_s1, col_s2, col)
+        time.sleep(0.001) # Settle time
+        current_sensor = scan_in.value
+        lsr_enbl.value = 1
+        if current_sensor == note_on_logic:   # Laser is not reaching the sensor
+          note_valid[cell] = 0    # Mark the note as dead
+        else:
+          note_valid[cell] = 1    # Mark the note as working
+
+def scanMatrix():
+  # global note_valid, state_scale
+  for col in range(0,num_cols):
+    for row in range(0,num_rows):
+      cell = col*6 + row
+      if scale_map[state_scale][cell]==1 and note_valid[cell]==1:
+        lsr_enbl.value = 0
+        selectMuxChannel(row_s0, row_s1, row_s2, row)
+        selectMuxChannel(col_s0, col_s1, col_s2, col)
+        current_note = scan_in.value
+        lsr_enbl.value = 1
+        if (current_note==1 and note_active[cell]==0):
+          note_active[cell] = current_note
+          testScale(cell)
+        elif (current_note==0 and note_active[cell]==1):
+          note_active[cell] = current_note
+          releaseNote(cell)
+
+def slow_scan():
+  # Slowly cycle round all lasers
+  for _ in range(0,slow_scan_count):
+    for col in range(0,num_cols):
+      for row in range(0,num_rows):
+        lsr_enbl.value = 0
+        selectMuxChannel(row_s0, row_s1, row_s2, row)
+        selectMuxChannel(col_s0, col_s1, col_s2, col)
+        lsr_enbl.value = 1
+        time.sleep(slow_scan_speed)
+
+# TODO: Review these - may be needed if digital input used for laser detection.
 # def test_scan( cell):
 #   global note_active
 #   # Test for valid cell (valid LDR)
@@ -397,119 +521,128 @@ def bend(bend_val):
 #     current_note = scan_in.value
 #     if (current_note==1 and note_active[cell]==0):
 #       note_active[cell] = current_note
-#       testScale(cell)
-    
+#       testScale(cell)  
 #     elif (current_note==0 and note_active[cell]==1):
 #       note_active[cell] = current_note
 #       releaseNote(cell)
 
-def read_averaged_adc():
-    global laser_samples
-    total = 0
-    for _ in range(laser_samples):
-        total += laser_read_in.value
-        # Small delay, but not strictly necessary; helps a tiny bit with noise
-        time.sleep(0.0002)  # 200 us
-    return total // laser_samples
+# # TODO: Review these - may not be needed if digital input used for laser detection.
+# def read_averaged_adc():
+#     global laser_samples
+#     total = 0
+#     for _ in range(laser_samples):
+#         total += laser_read_in.value
+#         # Small delay, but not strictly necessary; helps a tiny bit with noise
+#         time.sleep(0.0002)  # 200 us
+#     return total // laser_samples
 
-def test_input(cell):
-  global laser_threshold, laser_positive_threshold
-  lsr_input = read_averaged_adc()
-  if (lsr_input >= (int(laser_threshold[cell] * laser_positive_threshold))):
-    return 1
-  else:
-    return 0
+# TODO: Review these - may not be needed if digital input used for laser detection. May need modification for digital input.
+# def test_input(cell):
+#   # global laser_threshold, laser_positive_threshold
+#   # lsr_input = read_averaged_adc()
+#   # if (lsr_input >= (int(laser_threshold[cell] * laser_positive_threshold))):
+#   #   return 1
+#   # else:
+#   #   return 0
+#   if scan_in.value == note_on_logic:
+#     return 1
+#   else:
+#     return 0
 
-def test_scan( cell):
-  global note_active
-  # Test for valid cell (valid LDR)
-  if note_valid[cell] == 1:
-    # Read input
-    current_note = test_input(cell)
-    if (current_note==1 and note_active[cell]==0):
-      note_active[cell] = current_note
-      testScale(cell)
-    elif (current_note==0 and note_active[cell]==1):
-      note_active[cell] = current_note
-      releaseNote(cell)
+# def test_scan( cell):
+#   global note_active
+#   # Test for valid cell
+#   if note_valid[cell] == 1:
+#     # Read input
+#     current_note = test_input(cell)
+#     if (current_note==1 and note_active[cell]==0):
+#       note_active[cell] = current_note
+#       testScale(cell)
+#     elif (current_note==0 and note_active[cell]==1):
+#       note_active[cell] = current_note
+#       releaseNote(cell)
 
-def selectMuxChannel(s0, s1, s2, mux):
-  s0.value = (mux & 0x01) > 0  # Set LSB
-  s1.value = (mux & 0x02) > 0  # Set second bit
-  s2.value = (mux & 0x04) > 0  # Set third bit
+# TODO: Review these - may not be needed if digital input used for laser detection.
+# def set_background_value():
+#     global ground_value
+#     time.sleep(0.001)  # Let things settle
+#     print("Starting background calibration...")
+#     for iteration in range(200):  # Safeguard: limit iterations
+#         adc_val = read_averaged_adc()
+#         error = ground_value - adc_val
 
-def set_background_value():
-    global ground_value
-    time.sleep(0.001)  # Let things settle
-    print("Starting background calibration...")
-    for iteration in range(200):  # Safeguard: limit iterations
-        adc_val = read_averaged_adc()
-        error = ground_value - adc_val
+#         print("Iter {:3d}: ADC = {}, error = {}".format(iteration, adc_val, error))
 
-        print("Iter {:3d}: ADC = {}, error = {}".format(iteration, adc_val, error))
+#         # If we're close enough, stop
+#         if abs(error) < ground_value:  # Tolerance (~200/65535 of full scale)
+#             print("Calibration converged: ADC =", adc_val)
+#             break
 
-        # If we're close enough, stop
-        if abs(error) < ground_value:  # Tolerance (~200/65535 of full scale)
-            print("Calibration converged: ADC =", adc_val)
-            break
+#         # Simple proportional-ish step
+#         # Tune the divisor here if it overshoots or converges too slowly
+#         step = error // 64
+#         if step == 0:
+#             step = 1 if error > 0 else -1
+#         background_pwm_value += step
+#         # Clamp to valid PWM range
+#         if background_pwm_value < 0:
+#             background_pwm_value = 0
+#         elif background_pwm_value > v_ref_scale:
+#             background_pwm_value = v_ref_scale
 
-        # Simple proportional-ish step
-        # Tune the divisor here if it overshoots or converges too slowly
-        step = error // 64
-        if step == 0:
-            step = 1 if error > 0 else -1
-        background_pwm_value += step
-        # Clamp to valid PWM range
-        if background_pwm_value < 0:
-            background_pwm_value = 0
-        elif background_pwm_value > v_ref_scale:
-            background_pwm_value = v_ref_scale
+#         v_ref_out.duty_cycle = background_pwm_value
 
-        v_ref_out.duty_cycle = background_pwm_value
+#         # Give RC filter and op-amp time to settle to new VREF
+#         time.sleep(0.001)
 
-        # Give RC filter and op-amp time to settle to new VREF
-        time.sleep(0.001)
+#     print("Final PWM for background:", background_pwm_value)
+#     print("Background calibration done.\n")
 
-    print("Final PWM for background:", background_pwm_value)
-    print("Background calibration done.\n")
-
-def set_laser_thresholds():
-  global laser_threshold
-  for row in range(1,num_rows):
-    selectMuxChannel(row_s0, row_s1, row_s2, row)
-    time.sleep(0.001)
-    for col in range(1,num_cols):
-      selectMuxChannel(col_s0, col_s1, col_s2, col)
-      time.sleep(0.001)
-      laser_threshold[(col-1)*6 + (row-1)] = read_averaged_adc()
+# TODO: Review these - may not be needed if digital input used for laser detection.
+# def set_laser_thresholds():
+#   global laser_threshold
+#   for row in range(1,num_rows):
+#     selectMuxChannel(row_s0, row_s1, row_s2, row)
+#     time.sleep(0.001)
+#     for col in range(1,num_cols):
+#       selectMuxChannel(col_s0, col_s1, col_s2, col)
+#       time.sleep(0.001)
+#       laser_threshold[(col-1)*6 + (row-1)] = read_averaged_adc()
   
-def scanMatrix():
-  for row in range(1,num_rows):
-    selectMuxChannel(row_s0, row_s1, row_s2, row)
-    time.sleep(0.001)
-    for col in range(1,num_cols):
-      selectMuxChannel(col_s0, col_s1, col_s2, col)
-      time.sleep(0.001)
-      test_scan((col-1)*6 + (row-1))
-  set_background_value()
+# def scanMatrix():
+#   for row in range(1,num_rows):
+#     selectMuxChannel(row_s0, row_s1, row_s2, row)
+#     time.sleep(0.001)
+#     for col in range(1,num_cols):
+#       selectMuxChannel(col_s0, col_s1, col_s2, col)
+#       time.sleep(0.001)
+#       test_scan((col-1)*6 + (row-1))
+#   set_background_value()
+        
+# TODO: Review these - check input logic
+# def testcells():
+#   global note_valid
+#     # Loop three times around the LDR array and look for blocked/non-working sensors
+#     # Non-working notes will be ignored in scans so that they don't play continuously.
+#   for _ in range(3):
+#     for row in range(0,num_rows):
+#       selectMuxChannel(row_s0, row_s1, row_s2, row)
+#       time.sleep(0.001)
+#       for col in range(0,num_cols):
+#         selectMuxChannel(col_s0, col_s1, col_s2, col)
+#         time.sleep(0.001)
+#         cell = col*6 + row
+#         current_sensor = scan_in.value
+#         if current_sensor == 1:   # Laser is not reaching the sensor
+#           note_valid[cell] = 0    # Mark the note as dead
+#         else:
+#           note_valid[cell] = 1    # Mark the note as working
 
-def testLDRs():
-  global note_valid
-    # Loop three times around the LDR array and look for blocked/non-working sensors
-    # Non-working notes will be ignored in scans so that they don't play continuously.
-  for _ in range(3):
-    for row in range(1,num_rows):
-      selectMuxChannel(row_s0, row_s1, row_s2, row)
-      time.sleep(0.001)
-      for col in range(1,num_cols):
-        selectMuxChannel(col_s0, col_s1, col_s2, col)
-        time.sleep(0.001)
-        cell = ((col-1)*6 + (row-1))
-        current_sensor = scan_in.value
-        if current_sensor == 1:   # Laser is not reaching the sensor
-          note_valid[cell] = 0    # Mark the note as dead
-        else:
-          note_valid[cell] = 1    # Mark the note as working
+
+
+# +-------------------------------+
+# | Async MIDI controls read cycle |
+# +-------------------------------+
 
 def test_midi_controls():
   global last_octave_up, last_octave_down, last_bend, last_mod, last_sustain
@@ -556,15 +689,17 @@ def test_midi_controls():
 ################################
 # This is the main entry point #
 ################################
-set_background_value()
-set_laser_thresholds()
+# TODO: Review these - may not be needed if digital input used for laser detection.
+# set_background_value()
+# set_laser_thresholds()
 
+show_splash()
+output_enable = False
+checkForValidNotes()
 set_main_menu()
-# global next_cycle
-next_cycle = 0
-# testLDRs()
+
 while True:
   test_menu_buttons()
-  scanMatrix()
-  test_midi_controls()
-  next_cycle = 1  # Ignore note generation for the first cycle
+ # scanMatrix()
+ # test_midi_controls()
+  output_enable = True  # Ignore note generation for the setup cycle
