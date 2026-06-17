@@ -449,9 +449,9 @@ def checkForValidNotes():
       lsr_enbl.value = 0
       selectMuxChannel(row_s0, row_s1, row_s2, row)
       selectMuxChannel(col_s0, col_s1, col_s2, col)
+      lsr_enbl.value = 1
       time.sleep(0.001) # Settle time
       current_sensor = scan_in.value
-      lsr_enbl.value = 1
       if current_sensor == note_on_logic:   # Laser is not reaching the sensor
         note_valid[cell] = 0    # Mark the note as dead
       else:
@@ -468,9 +468,9 @@ def scanMatrix():
         lsr_enbl.value = 0
         selectMuxChannel(row_s0, row_s1, row_s2, row)
         selectMuxChannel(col_s0, col_s1, col_s2, col)
+        lsr_enbl.value = 1
         # time.sleep(0.001) # Settle time
         current_sensor = scan_in.value
-        lsr_enbl.value = 1
         if (current_sensor==note_on_logic and note_active[cell]==0):
           note_active[cell] = 1
           testScale(cell)
