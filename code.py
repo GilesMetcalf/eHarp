@@ -72,7 +72,7 @@ num_rows = 6
 num_cols = 6
 calibration_scans = 10 
 note_on_logic = 0 # input value for "on" note
-output_enable = False
+output_enable = False # Disable MIDI note generation for setup and calibration
 slow_scan_count = 5   # number of cycles for slow scan
 slow_scan_speed = 0.25 # number of seconds for each step in slow scan
 
@@ -183,15 +183,15 @@ note_active = [0 for i in range(num_notes)]
 note_valid = [1 for i in range(num_notes)]
 
 # Display constants
-WIDTH = 128
-HEIGHT = 128
-BORDER = 2
+display_width = 128
+display_height = 128
+# BORDER = 2
 displayio.release_displays()
 i2c = busio.I2C(board.GP5, board.GP4)  # Update pins if needed
 display_bus = displayio.I2CDisplay(i2c, device_address=0x3C)
-display = adafruit_displayio_sh1107.SH1107(display_bus, width=WIDTH, height=HEIGHT)
+display = adafruit_displayio_sh1107.SH1107(display_bus, width=display_width, height=display_height)
 display.rotation = 180
-splash_time = 10  # Splashscreen display time
+splash_time = 6  # Splashscreen display time (secs)
 
 # +----------------------------+
 # | Menu and display functions |
@@ -294,33 +294,33 @@ def set_system_menu():
 def select_item():
   global state_scale, state_tune, state_channel, state_velocity, state_system, output_enable
   # Menu logic
-  if current_menu==0:
-    if current_pointer==0:  # Main menu -> Scales
+  if current_menu == 0:
+    if current_pointer == 0:  # Main menu -> Scales
       set_scale_menu()
-    if current_pointer==1:  # Main menu -> Tuning
+    if current_pointer == 1:  # Main menu -> Tuning
       set_tune_menu()
-    if current_pointer==2: # Main menu -> MIDI channel
+    if current_pointer == 2: # Main menu -> MIDI channel
       set_midi_menu()
-    if current_pointer==3: # Main menu -> Velocity
+    if current_pointer == 3: # Main menu -> Velocity
       set_velocity_menu()
-    if current_pointer==4: # Main menu -> System
+    if current_pointer == 4: # Main menu -> System
       set_system_menu()   
 
-  if current_menu==1:
+  if current_menu == 1:
     state_scale = current_pointer
-  if current_menu==2:
+  if current_menu == 2:
     state_tune = current_pointer
-  if current_menu==3:
+  if current_menu == 3:
      state_channel = current_pointer
-  if current_menu==4:
+  if current_menu == 4:
     state_velocity = current_pointer
-  if current_menu==5:
+  if current_menu == 5:
     state_system = current_pointer
-    if current_pointer==0:  # Calibration
+    if current_pointer == 0:  # Calibration
       output_enable = False
       checkForValidNotes()
       output_enable = True
-    elif current_pointer==1:  # Slow scan
+    elif current_pointer ==1 :  # Slow scan
       slow_scan()
 
 def  back_to_main():
@@ -329,22 +329,22 @@ def  back_to_main():
 def step_up():
   global current_pointer
   current_pointer = current_pointer + 1
-  if current_menu==0:
+  if current_menu == 0:
     if current_pointer>len(main_menu)-1:
       current_pointer = len(main_menu)-1
-  if current_menu==1:
+  if current_menu == 1:
     if current_pointer>len(scales)-1:
       current_pointer = len(scales)-1
-  if current_menu==2:
+  if current_menu == 2:
     if current_pointer>len(tuning)-1:
       current_pointer = len(tuning)-1
-  if current_menu==3:
+  if current_menu == 3:
     if current_pointer>len(channel)-1:
       current_pointer = len(channel)-1
-  if current_menu==4:
+  if current_menu == 4:
     if current_pointer>len(velocity):
       current_pointer = len(velocity)-1
-  if current_menu==5:
+  if current_menu == 5:
     if current_pointer>len(system_menu):
       current_pointer = len(system_menu)-1
   show_menu(current_menu, current_pointer)
@@ -358,28 +358,28 @@ def step_down():
 
 def test_menu_buttons():
   global last_button_state
-  if button_up.value==0 and last_button_state[0]==0:
+  if button_up.value == 0 and last_button_state[0] == 0:
     last_button_state[0] = 1
     step_up()
-  if button_dn.value==0 and last_button_state[1]==0:
+  if button_dn.value == 0 and last_button_state[1] == 0:
     last_button_state[1] = 1
     step_down()
-  if button_sel.value==0 and last_button_state[2]==0:
+  if button_sel.value == 0 and last_button_state[2] == 0:
     last_button_state[2] = 1
     select_item()
-  if button_bck.value==0 and last_button_state[3]==0:
+  if button_bck.value == 0 and last_button_state[3] == 0:
     last_button_state[3] = 1
     back_to_main()
-  if button_up.value==1 and last_button_state[0]==1:
+  if button_up.value == 1 and last_button_state[0] == 1:
     last_button_state[0] = 0
     step_up
-  if button_dn.value==1 and last_button_state[1]==1:
+  if button_dn.value == 1 and last_button_state[1] == 1:
     last_button_state[1] = 0
     step_down
-  if button_sel.value==1 and last_button_state[2]==1:
+  if button_sel.value == 1 and last_button_state[2] == 1:
     last_button_state[2] = 0
     select_item()
-  if button_bck.value==1 and last_button_state[3]==1:
+  if button_bck.value == 1 and last_button_state[3] == 1:
     last_button_state[3] = 0  
 
 
@@ -428,7 +428,6 @@ def bend(bend_val):
   midi.send(PitchBend(int(bend_val)), get_channel())
 
 
-
 # +----------------------+
 # | Laser scan functions |
 # +----------------------+
@@ -439,9 +438,10 @@ def selectMuxChannel(s0, s1, s2, mux):
   s2.value = (mux & 0x04) > 0  # Set third bit
 
 def checkForValidNotes():
-  global note_valid
+  global note_valid, output_enable
     # Loop around the array and look for blocked/non-working lasers
     # Non-working notes will be ignored in scans so that they don't play continuously.
+  output_enable = False
   for _ in range(calibration_scans):
     for cell in range(0,num_notes):
       row = cell % num_rows
@@ -457,12 +457,13 @@ def checkForValidNotes():
       else:
         note_valid[cell] = 1    # Mark the note as working
   # Back to main menu
+  output_enable = True
   back_to_main()
 
 def scanMatrix():
   # global note_valid, state_scale
   for cell in range(0,num_notes):
-      if scale_map[state_scale][cell]==1 and note_valid[cell]==1:
+      if scale_map[state_scale][cell] == 1 and note_valid[cell] == 1:
         row = cell % num_rows
         col = cell // num_rows
         lsr_enbl.value = 0
@@ -471,15 +472,17 @@ def scanMatrix():
         lsr_enbl.value = 1
         # time.sleep(0.001) # Settle time
         current_sensor = scan_in.value
-        if (current_sensor==note_on_logic and note_active[cell]==0):
+        if (current_sensor == note_on_logic and note_active[cell] == 0):
           note_active[cell] = 1
           testScale(cell)
-        elif (current_sensor!=note_on_logic and note_active[cell]==1):
+        elif (current_sensor != note_on_logic and note_active[cell] == 1):
           note_active[cell] = 0
           releaseNote(cell)
 
 def slow_scan():
   # Slowly cycle round all lasers
+  global output_enable
+  output_enable = False
   for _ in range(0,slow_scan_count):
     for cell in range(0,num_notes):
       row = cell % num_rows
@@ -490,6 +493,7 @@ def slow_scan():
       lsr_enbl.value = 1
       time.sleep(slow_scan_speed)
   # Back to main menu
+  output_enable = True
   back_to_main()
 
 # +-------------------------------+
@@ -550,7 +554,7 @@ set_main_menu()
 
 # Loop forever...
 while True:
-  test_menu_buttons()
- # scanMatrix()
- # test_midi_controls()
   output_enable = True  # Ignore note generation for the setup cycle
+  test_menu_buttons()
+  scanMatrix()
+  test_midi_controls()
