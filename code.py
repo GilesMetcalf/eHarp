@@ -185,12 +185,13 @@ note_valid = [1 for i in range(num_notes)]
 # Display constants
 display_width = 128
 display_height = 128
-# BORDER = 2
+display_offset = 0  # Needed for this particular oLED display
 displayio.release_displays()
 i2c = busio.I2C(board.GP5, board.GP4)  # Update pins if needed
 display_bus = displayio.I2CDisplay(i2c, device_address=0x3C)
-display = adafruit_displayio_sh1107.SH1107(display_bus, width=display_width, height=display_height)
+display = adafruit_displayio_sh1107.SH1107(display_bus, width=display_width, height=display_height, display_offset=display_offset)
 display.rotation = 180
+
 splash_time = 6  # Splashscreen display time (secs)
 
 # +----------------------------+
@@ -200,13 +201,20 @@ splash_time = 6  # Splashscreen display time (secs)
 def show_splash():
   splash_group = displayio.Group()
   bitmap = displayio.OnDiskBitmap("/logo.bmp")
-  tile_grid = displayio.TileGrid(
-      bitmap,
-      pixel_shader=bitmap.pixel_shader
-  )
+  tile_grid = displayio.TileGrid(bitmap, pixel_shader=bitmap.pixel_shader, x=0, y=-10)
   splash_group.append(tile_grid)
   display.root_group = splash_group
-  time.sleep(splash_time)
+  start_time = time.monotonic()
+  while time.monotonic() - start_time < splash_time:  # Press any button to continue...
+    if not button_up.value:
+      break
+    if not button_dn.value:
+      break
+    if not button_sel.value:
+      break
+    if not button_bck.value:
+      break
+    time.sleep(0.05)
 
 def get_window(this_menu, this_pointer):
   item_count = len(this_menu)
@@ -217,7 +225,7 @@ def get_window(this_menu, this_pointer):
 
 def show_menu(menu, pointer):
   global current_top
-  menu_group = displayio.Group(x=15, y=-10)
+  menu_group = displayio.Group(x=-6, y=-16)
   if menu == 0 :
     working_menu = main_menu
   elif menu == 1 :
