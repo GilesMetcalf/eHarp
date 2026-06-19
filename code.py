@@ -138,7 +138,7 @@ channel = ["0", "1", "2", "3", "4", "5", "6", "7", "8", "9", "10"]
 
 velocity = ["8", "16", "24", "32", "48", "64","72", "80", "96", "112", "127"]
 
-system_menu = ["Calibration","SlowScan"]
+system_menu = ["Calibration","SlowScan", "Single Step"]
 
 # Mapping scales
 scale_map = [
@@ -191,7 +191,6 @@ i2c = busio.I2C(board.GP5, board.GP4)  # Update pins if needed
 display_bus = displayio.I2CDisplay(i2c, device_address=0x3C)
 display = adafruit_displayio_sh1107.SH1107(display_bus, width=display_width, height=display_height, display_offset=display_offset)
 display.rotation = 180
-
 splash_time = 6  # Splashscreen display time (secs)
 
 # +----------------------------+
@@ -328,8 +327,10 @@ def select_item():
       output_enable = False
       checkForValidNotes()
       output_enable = True
-    elif current_pointer ==1 :  # Slow scan
+    elif current_pointer == 1 :  # Slow scan
       slow_scan()
+    elif current_pointer == 2 :  # Single step
+      single_step()
 
 def  back_to_main():
   set_main_menu()
@@ -445,6 +446,15 @@ def selectMuxChannel(s0, s1, s2, mux):
   s1.value = (mux & 0x02) > 0  # Set second bit
   s2.value = (mux & 0x04) > 0  # Set third bit
 
+def selectLaser(cell):
+  # Select and turn on the selected laser
+  row = cell % num_rows
+  col = cell // num_rows
+  lsr_enbl.value = 0
+  selectMuxChannel(row_s0, row_s1, row_s2, row)
+  selectMuxChannel(col_s0, col_s1, col_s2, col)
+  lsr_enbl.value = 1
+
 def checkForValidNotes():
   global note_valid, output_enable
     # Loop around the array and look for blocked/non-working lasers
@@ -452,12 +462,7 @@ def checkForValidNotes():
   output_enable = False
   for _ in range(calibration_scans):
     for cell in range(0,num_notes):
-      row = cell % num_rows
-      col = cell // num_rows
-      lsr_enbl.value = 0
-      selectMuxChannel(row_s0, row_s1, row_s2, row)
-      selectMuxChannel(col_s0, col_s1, col_s2, col)
-      lsr_enbl.value = 1
+      selectLaser(cell)
       time.sleep(0.001) # Settle time
       current_sensor = scan_in.value
       if current_sensor == note_on_logic:   # Laser is not reaching the sensor
@@ -472,12 +477,7 @@ def scanMatrix():
   # global note_valid, state_scale
   for cell in range(0,num_notes):
       if scale_map[state_scale][cell] == 1 and note_valid[cell] == 1:
-        row = cell % num_rows
-        col = cell // num_rows
-        lsr_enbl.value = 0
-        selectMuxChannel(row_s0, row_s1, row_s2, row)
-        selectMuxChannel(col_s0, col_s1, col_s2, col)
-        lsr_enbl.value = 1
+        selectLaser(cell)
         # time.sleep(0.001) # Settle time
         current_sensor = scan_in.value
         if (current_sensor == note_on_logic and note_active[cell] == 0):
@@ -493,16 +493,37 @@ def slow_scan():
   output_enable = False
   for _ in range(0,slow_scan_count):
     for cell in range(0,num_notes):
-      row = cell % num_rows
-      col = cell // num_rows
-      lsr_enbl.value = 0
-      selectMuxChannel(row_s0, row_s1, row_s2, row)
-      selectMuxChannel(col_s0, col_s1, col_s2, col)
-      lsr_enbl.value = 1
+      selectLaser(cell)
       time.sleep(slow_scan_speed)
   # Back to main menu
   output_enable = True
   back_to_main()
+
+def single_step():
+  # Manually step through lasers
+  global last_button_state
+  this_step = 0
+  while True:
+    if button_up.value == 0 and last_button_state[0] == 0:
+      last_button_state[0] = 1
+      this_step += 1
+      if this_step > num_notes - 1:
+        this_step = num_notes - 1
+    if button_dn.value == 0 and last_button_state[1] == 0:
+      last_button_state[1] = 1
+      this_step -= 1
+      if this_step < 0:
+        this_step = 0
+    if button_bck.value == 0 and last_button_state[3] == 0:
+      last_button_state[3] = 1
+      break
+    selectLaser(this_step)
+    time.sleep(0.5) # Allow time to release the button!
+    last_button_state[0] = 0
+    last_button_state[1] = 0
+  lsr_enbl.value = 0  # Turn off any lasers
+  back_to_main()
+
 
 # +-------------------------------+
 # | Async MIDI controls read cycle |
