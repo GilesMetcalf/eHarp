@@ -74,14 +74,17 @@ baseline_out = pwmio.PWMOut(board.GP18, frequency=500)
 num_notes = 32
 num_rows = 6
 num_cols = 6
-calibration_scans = 10 
 note_on_logic = 0 # input value for "on" note
 output_enable = False # Disable MIDI note generation for setup and calibration
+
+# Calibration and diagnostics constants
+calibration_scans = 10 
 slow_scan_count = 5   # number of cycles for slow scan
 slow_scan_speed = 0.25  # number of seconds for each step in slow scan
 dcmv_ratio = 10   # Duty cycle to mV ration for baseline control
 base_offset = 20  # Offset to set baseline value. Should be slightly above 0mV
 base_settle = 0.01  # Baseline ADC settle time in seconds
+initial_baseline = 150  # Initial baseline output value on boot
 
 # Menu constants
 len_main = 3
@@ -102,7 +105,6 @@ state_tune = 6
 state_channel = 1
 state_octave = 0
 state_velocity = 6
-# state_system = 0
 
 # Menus
 scales = [
@@ -607,9 +609,10 @@ def test_midi_controls():
 # This is the main entry point #
 ################################
 
-# Initial setup stuff
-show_splash()
+# Initial setup stuff and boot sequence
+baseline_out.duty_cycle = initial_baseline
 output_enable = False
+show_splash()
 calibrate()
 show_menu(main_menu,main_menu.pointer)
 
