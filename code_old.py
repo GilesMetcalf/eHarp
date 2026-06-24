@@ -66,10 +66,6 @@ scan_in.direction = digitalio.Direction.INPUT
 lsr_enbl = digitalio.DigitalInOut(board.GP9)
 lsr_enbl.direction = digitalio.Direction.OUTPUT
 
-# IO ports (analogue input control)
-baseline_in = analogio.AnalogIn(board.A0)
-baseline_out = pwmio.PWMOut(board.GP18, frequency=500)
-
 # Scanning constants
 num_notes = 32
 num_rows = 6
@@ -78,10 +74,7 @@ calibration_scans = 10
 note_on_logic = 0 # input value for "on" note
 output_enable = False # Disable MIDI note generation for setup and calibration
 slow_scan_count = 5   # number of cycles for slow scan
-slow_scan_speed = 0.25  # number of seconds for each step in slow scan
-dcmv_ratio = 10   # Duty cycle to mV ration for baseline control
-base_offset = 20  # Offset to set baseline value. Should be slightly above 0mV
-base_settle = 0.01  # Baseline ADC settle time in seconds
+slow_scan_speed = 0.25 # number of seconds for each step in slow scan
 
 # Menu constants
 len_main = 3
@@ -105,6 +98,14 @@ state_velocity = 6
 # state_system = 0
 
 # Menus
+main_menu = [
+  "Scale / mode",
+  "Tuning",
+  "MIDI channel",
+  "Velocity",
+  "System"
+]
+
 scales = [
   "Chromatic",
   "Major",
@@ -192,206 +193,9 @@ display = adafruit_displayio_sh1107.SH1107(display_bus, width=display_width, hei
 display.rotation = 180
 splash_time = 6  # Splashscreen display time (secs)
 
-
-# +----------------------+
-# | Laser scan functions |
-# +----------------------+
-
-def selectMuxChannel(s0, s1, s2, mux):
-  s0.value = (mux & 0x01) > 0  # Set LSB
-  s1.value = (mux & 0x02) > 0  # Set second bit
-  s2.value = (mux & 0x04) > 0  # Set third bit
-
-def selectLaser(cell):
-  # Select and turn on the selected laser
-  row = cell % num_rows
-  col = cell // num_rows
-  lsr_enbl.value = 0
-  selectMuxChannel(row_s0, row_s1, row_s2, row)
-  selectMuxChannel(col_s0, col_s1, col_s2, col)
-  lsr_enbl.value = 1
-
-def set_baseline():
-  lsr_enbl.value = 0
-  for _ in range(calibration_scans):
-    base_mv = baseline_in.value / dcmv_ratio
-    time.sleep(base_settle)
-    if base_mv > base_offset:
-      offset = base_mv - base_offset
-      baseline_out.duty_cycle = offset * dcmv_ratio
-
-def checkForValidNotes():
-  print("Got to calibration function")
-  global note_valid, output_enable
-    # Loop around the array and look for blocked/non-working lasers
-    # Non-working notes will be ignored in scans so that they don't play continuously.
-  output_enable = False
-  for _ in range(calibration_scans):
-    for cell in range(0,num_notes):
-      selectLaser(cell)
-      time.sleep(0.001) # Settle time
-      current_sensor = scan_in.value
-      if current_sensor == note_on_logic:   # Laser is not reaching the sensor
-        note_valid[cell] = 0    # Mark the note as dead
-      else:
-        note_valid[cell] = 1    # Mark the note as working
-  # Back to main menu
-  output_enable = True
-  go_back()
-
-def calibrate():
-  set_baseline()
-  checkForValidNotes()
-
-def scanMatrix():
-  # global note_valid, state_scale
-  for cell in range(0,num_notes):
-      if scale_map[state_scale][cell] == 1 and note_valid[cell] == 1:
-        selectLaser(cell)
-        # time.sleep(0.001) # Settle time
-        current_sensor = scan_in.value
-        print("Read {} for note {}".format (current_sensor, cell))
-        if (current_sensor == note_on_logic and note_active[cell] == 0):
-          note_active[cell] = 1
-          testScale(cell)
-        elif (current_sensor != note_on_logic and note_active[cell] == 1):
-          note_active[cell] = 0
-          releaseNote(cell)
-
-def slow_scan():
-  print("Got to slow scan function")
-  # Slowly cycle round all lasers
-  global output_enable
-  output_enable = False
-  for _ in range(0,slow_scan_count):
-    for cell in range(0,num_notes):
-      selectLaser(cell)
-      time.sleep(slow_scan_speed)
-  # Back to main menu
-  output_enable = True
-  go_back()
-
-def single_step():
-  print("Got to single step function")
-  # Manually step through lasers
-  global last_button_state
-  this_step = 0
-  while True:
-    if button_up.value == 0 and last_button_state[0] == 0:
-      last_button_state[0] = 1
-      this_step += 1
-      if this_step > num_notes - 1:
-        this_step = num_notes - 1
-    if button_dn.value == 0 and last_button_state[1] == 0:
-      last_button_state[1] = 1
-      this_step -= 1
-      if this_step < 0:
-        this_step = 0
-    if button_bck.value == 0 and last_button_state[3] == 0:
-      last_button_state[3] = 1
-      break
-    selectLaser(this_step)
-    time.sleep(0.5) # Allow time to release the button!
-    last_button_state[0] = 0
-    last_button_state[1] = 0
-    last_button_state[3] = 0
-    lsr_enbl.value = 0  # Turn off any lasers
-  go_back()
-
-
-# +--------------------------+
-# | Scale and MIDI functions |
-# +--------------------------+
-def set_scale(index):
-  global state_scale
-  state_scale = index
-  scale_menu.pointer = index
-  print("Current scale:", scales[state_scale])
-  go_back()
-
-def set_tune(index):
-  global state_tune
-  state_tune = index
-  tuning_menu.pointer = index
-  print("Current tuning:", tuning[state_scale])
-  go_back()
-
-def set_velocity(index):
-  global state_velocity
-  state_velocity = index
-  velocity_menu.pointer = index
-  print("Current velocity:", velocity[state_velocity])
-  go_back()
-
-def set_channel(index):
-  global state_channel
-  state_channel = index
-  channel_menu.pointer = index
-  print("Current channel:", channel[state_channel])
-  go_back()
-
-
 # +----------------------------+
 # | Menu and display functions |
 # +----------------------------+
-
-# Classes for menu handling
-class Menu:
-  def __init__(self, title, items, pointer = 0):
-    self.title = title
-    self.items = items
-    self.pointer = max(0, min(pointer, len(items) - 1))
-class MenuItem:
-  def __init__(self, text, action=None, submenu=None):
-    self.text = text
-    self.action = action
-    self.submenu = submenu
-
-
-# Menu configuration
-scale_menu = Menu(
-  "Scales",
-  [MenuItem(
-    scale_name, action=lambda idx=i: set_scale(idx))
-    for i, scale_name in enumerate(scales)
-  ], state_scale)
-
-tuning_menu = Menu(
-  "Tuning",
-  [MenuItem(
-    tuning_value, action=lambda idx=i: set_tune(idx))
-    for i, tuning_value in enumerate(tuning)
-  ], state_tune)
-
-channel_menu = Menu(
-  "Channel",
-  [MenuItem(
-    channel_value, action=lambda idx=i: set_channel(idx))
-    for i, channel_value in enumerate(channel)
-  ], state_channel)
-
-velocity_menu = Menu(
-  "Velocity",
-  [MenuItem(
-    velocity_value, action=lambda idx=i: set_velocity(idx))
-    for i, velocity_value in enumerate(velocity)
-  ], state_velocity)
-
-system_menu = Menu("System", [
-  MenuItem("Calibration", action=calibrate),
-  MenuItem("Slow Scan", action=slow_scan),
-  MenuItem("Single Step", action=single_step)
-])
-
-main_menu = Menu("Main", [
-  MenuItem("Scale / Mode", submenu=scale_menu),
-  MenuItem("Tuning", submenu=tuning_menu),
-  MenuItem("MIDI Channel", submenu=channel_menu),
-  MenuItem("Velocity", submenu=velocity_menu),
-  MenuItem("System", submenu=system_menu)
-])
-
-menu_stack = [main_menu]
 
 def show_splash():
   splash_group = displayio.Group()
@@ -419,73 +223,147 @@ def get_window(this_menu, this_pointer):
   return start, end
 
 def show_menu(menu, pointer):
-  start, end = get_window(menu.items, pointer)
+  global current_top
   menu_group = displayio.Group(x=-6, y=-16)
+  if menu == 0 :
+    working_menu = main_menu
+  elif menu == 1 :
+    working_menu = scales
+  elif menu == 2 :
+    working_menu = tuning
+  elif menu == 3 :
+    working_menu = channel
+  elif menu == 4 :
+    working_menu = velocity
+  elif menu == 5 :
+    working_menu = system_menu
+  start, end = get_window(working_menu, pointer)
+
   for i in range(start, end):
-    y_pos = 20 + ((i - start) * 12)
-    item = menu.items[i]
+    y_pos = 20 + ((i-start) * 12)
     if i == pointer:
-      bg_width = len(item.text) * 7
+      bg_width = len(working_menu[i]) * 7
       bg_bitmap = displayio.Bitmap(bg_width, 10, 2)
       bg_palette = displayio.Palette(2)
       bg_palette[0] = 0xFFFFFF
       bg_palette[1] = 0x000000
-      bg_tilegrid = displayio.TileGrid(
-        bg_bitmap,
-        pixel_shader=bg_palette,
-        x=20,
-        y=y_pos - 3
-      )
+      bg_tilegrid = displayio.TileGrid(bg_bitmap, pixel_shader=bg_palette, x=20, y=y_pos-3)
       menu_group.append(bg_tilegrid)
-      text_label = label.Label(
-        terminalio.FONT,
-        text=item.text,
-        color=0x000000,
-        x=20,
-        y=y_pos + 2
-      )
+      text_label = label.Label(terminalio.FONT, text=working_menu[i], color=0x000000, x=20, y=y_pos+2)
     else:
-      text_label = label.Label(
-        terminalio.FONT,
-        text=item.text,
-        color=0xFFFFFF,
-        x=20,
-        y=y_pos + 2
-      )
+      text_label = label.Label(terminalio.FONT, text=working_menu[i], color=0xFFFFFF, x=20, y=y_pos+2)
     menu_group.append(text_label)
   display.root_group = menu_group
 
+def set_main_menu():
+  global current_menu, current_pointer, state_menu
+  current_menu = 0
+  current_pointer = 0
+  state_menu = 0
+  show_menu(current_menu, current_pointer)
+
+def set_scale_menu():
+  global current_menu, current_pointer, state_menu
+  current_menu = 1
+  current_pointer = state_scale
+  state_menu = 1
+  show_menu(current_menu, current_pointer)
+
+def set_tune_menu():
+  global current_menu, current_pointer, state_menu
+  current_menu = 2
+  current_pointer = state_tune
+  state_menu = 2
+  show_menu(current_menu, current_pointer)
+
+def set_midi_menu():
+  global current_menu, current_pointer, state_menu
+  current_menu = 3
+  current_pointer = state_channel
+  state_menu = 3
+  show_menu(current_menu, current_pointer)
+
+def set_velocity_menu():
+  global current_menu, current_pointer, state_menu
+  current_menu = 4
+  current_pointer = state_velocity
+  state_menu = 4
+  show_menu(current_menu, current_pointer)
+
+def set_system_menu():
+  global current_menu, current_pointer, state_menu
+  current_menu = 5
+  current_pointer = 0
+  state_menu = 5
+  show_menu(current_menu, current_pointer)
+
+# Menu control handling
+def select_item():
+  global state_scale, state_tune, state_channel, state_velocity, state_system, output_enable
+  # Menu logic
+  if current_menu == 0:
+    if current_pointer == 0:  # Main menu -> Scales
+      set_scale_menu()
+    if current_pointer == 1:  # Main menu -> Tuning
+      set_tune_menu()
+    if current_pointer == 2: # Main menu -> MIDI channel
+      set_midi_menu()
+    if current_pointer == 3: # Main menu -> Velocity
+      set_velocity_menu()
+    if current_pointer == 4: # Main menu -> System
+      set_system_menu()   
+
+  if current_menu == 1:
+    state_scale = current_pointer
+  if current_menu == 2:
+    state_tune = current_pointer
+  if current_menu == 3:
+     state_channel = current_pointer
+  if current_menu == 4:
+    state_velocity = current_pointer
+  if current_menu == 5:
+    state_system = current_pointer
+    if current_pointer == 0:  # Calibration
+      output_enable = False
+      checkForValidNotes()
+      output_enable = True
+    elif current_pointer == 1 :  # Slow scan
+      slow_scan()
+    elif current_pointer == 2 :  # Single step
+      single_step()
+
+def  back_to_main():
+  set_main_menu()
+
 def step_up():
-  current_menu = menu_stack[-1]
-  current_menu.pointer += 1
-  if current_menu.pointer > len(current_menu.items) - 1:
-    current_menu.pointer = len(current_menu.items) - 1
-  show_menu(current_menu, current_menu.pointer)
+  global current_pointer
+  current_pointer = current_pointer + 1
+  if current_menu == 0:
+    if current_pointer>len(main_menu)-1:
+      current_pointer = len(main_menu)-1
+  if current_menu == 1:
+    if current_pointer>len(scales)-1:
+      current_pointer = len(scales)-1
+  if current_menu == 2:
+    if current_pointer>len(tuning)-1:
+      current_pointer = len(tuning)-1
+  if current_menu == 3:
+    if current_pointer>len(channel)-1:
+      current_pointer = len(channel)-1
+  if current_menu == 4:
+    if current_pointer>len(velocity):
+      current_pointer = len(velocity)-1
+  if current_menu == 5:
+    if current_pointer>len(system_menu):
+      current_pointer = len(system_menu)-1
+  show_menu(current_menu, current_pointer)
 
 def step_down():
-  current_menu = menu_stack[-1]
-  current_menu.pointer -= 1
-  if current_menu.pointer < 0:
-    current_menu.pointer = 0
-  show_menu(current_menu, current_menu.pointer)
-
-def select_item():
-  current_menu = menu_stack[-1]
-  selected_item = current_menu.items[current_menu.pointer]
-  if selected_item.submenu:
-    menu_stack.append(selected_item.submenu)
-    show_menu(selected_item.submenu, selected_item.submenu.pointer)
-  elif selected_item.action:
-     selected_item.action()
-
-def go_back():
-  if len(menu_stack) > 1:
-    menu_stack.pop()
-  current_menu = menu_stack[-1]
-  show_menu(current_menu, current_menu.pointer)
-
-def get_current_menu():
-    return menu_stack[-1]
+  global current_pointer
+  current_pointer = current_pointer - 1
+  if current_pointer<0:
+    current_pointer = 0
+  show_menu(current_menu, current_pointer)
 
 def test_menu_buttons():
   global last_button_state
@@ -500,14 +378,16 @@ def test_menu_buttons():
     select_item()
   if button_bck.value == 0 and last_button_state[3] == 0:
     last_button_state[3] = 1
-    go_back()
-    # Button release debounce clearing
+    back_to_main()
   if button_up.value == 1 and last_button_state[0] == 1:
     last_button_state[0] = 0
+    step_up
   if button_dn.value == 1 and last_button_state[1] == 1:
     last_button_state[1] = 0
+    step_down
   if button_sel.value == 1 and last_button_state[2] == 1:
     last_button_state[2] = 0
+    select_item()
   if button_bck.value == 1 and last_button_state[3] == 1:
     last_button_state[3] = 0  
 
@@ -555,6 +435,94 @@ def modChange(mod):
 
 def bend(bend_val):
   midi.send(PitchBend(int(bend_val)), get_channel())
+
+
+# +----------------------+
+# | Laser scan functions |
+# +----------------------+
+
+def selectMuxChannel(s0, s1, s2, mux):
+  s0.value = (mux & 0x01) > 0  # Set LSB
+  s1.value = (mux & 0x02) > 0  # Set second bit
+  s2.value = (mux & 0x04) > 0  # Set third bit
+
+def selectLaser(cell):
+  # Select and turn on the selected laser
+  row = cell % num_rows
+  col = cell // num_rows
+  lsr_enbl.value = 0
+  selectMuxChannel(row_s0, row_s1, row_s2, row)
+  selectMuxChannel(col_s0, col_s1, col_s2, col)
+  lsr_enbl.value = 1
+
+def checkForValidNotes():
+  global note_valid, output_enable
+    # Loop around the array and look for blocked/non-working lasers
+    # Non-working notes will be ignored in scans so that they don't play continuously.
+  output_enable = False
+  for _ in range(calibration_scans):
+    for cell in range(0,num_notes):
+      selectLaser(cell)
+      time.sleep(0.001) # Settle time
+      current_sensor = scan_in.value
+      if current_sensor == note_on_logic:   # Laser is not reaching the sensor
+        note_valid[cell] = 0    # Mark the note as dead
+      else:
+        note_valid[cell] = 1    # Mark the note as working
+  # Back to main menu
+  output_enable = True
+  back_to_main()
+
+def scanMatrix():
+  # global note_valid, state_scale
+  for cell in range(0,num_notes):
+      if scale_map[state_scale][cell] == 1 and note_valid[cell] == 1:
+        selectLaser(cell)
+        # time.sleep(0.001) # Settle time
+        current_sensor = scan_in.value
+        if (current_sensor == note_on_logic and note_active[cell] == 0):
+          note_active[cell] = 1
+          testScale(cell)
+        elif (current_sensor != note_on_logic and note_active[cell] == 1):
+          note_active[cell] = 0
+          releaseNote(cell)
+
+def slow_scan():
+  # Slowly cycle round all lasers
+  global output_enable
+  output_enable = False
+  for _ in range(0,slow_scan_count):
+    for cell in range(0,num_notes):
+      selectLaser(cell)
+      time.sleep(slow_scan_speed)
+  # Back to main menu
+  output_enable = True
+  back_to_main()
+
+def single_step():
+  # Manually step through lasers
+  global last_button_state
+  this_step = 0
+  while True:
+    if button_up.value == 0 and last_button_state[0] == 0:
+      last_button_state[0] = 1
+      this_step += 1
+      if this_step > num_notes - 1:
+        this_step = num_notes - 1
+    if button_dn.value == 0 and last_button_state[1] == 0:
+      last_button_state[1] = 1
+      this_step -= 1
+      if this_step < 0:
+        this_step = 0
+    if button_bck.value == 0 and last_button_state[3] == 0:
+      last_button_state[3] = 1
+      break
+    selectLaser(this_step)
+    time.sleep(0.5) # Allow time to release the button!
+    last_button_state[0] = 0
+    last_button_state[1] = 0
+  lsr_enbl.value = 0  # Turn off any lasers
+  back_to_main()
 
 
 # +-------------------------------+
@@ -610,8 +578,8 @@ def test_midi_controls():
 # Initial setup stuff
 show_splash()
 output_enable = False
-calibrate()
-show_menu(main_menu,main_menu.pointer)
+checkForValidNotes()
+set_main_menu()
 
 # Loop forever...
 while True:
