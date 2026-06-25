@@ -8,6 +8,7 @@ The eharp is a full-featured MIDI controller that offers the following functions
 - A choice of 32 different scales (modes)
 - A choice of MIDI channels
 - Transposition from -6 to +6 intervals. Essentially any key in the octave.
+- Selectable octave settings from -3 to +3
 - 11 selectable velocity settings
 - Pitch and Bend controls
 - Self-calibration to compensate for background light levels
