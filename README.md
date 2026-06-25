@@ -5,7 +5,6 @@ This is the ongoing eHarp project.
 The eharp is a full-featured MIDI controller that offers the following functions:
 - Up to 32 notes that can be played
 - Fully polyphonic
-- Multi-level menu system
 - A choice of 32 different scales (modes)
 - A choice of MIDI channels
 - Transposition from -6 to +6 intervals. Essentially any key in the octave.
@@ -13,18 +12,19 @@ The eharp is a full-featured MIDI controller that offers the following functions
 - 11 selectable velocity settings
 - Pitch and Bend controls
 - Sustain pedal input
+- Multi-level menu system
 - Self-calibration to compensate for background light levels
 - Several self-diagnostic features
 
 ## Architecture and principles
-The eHarp is based on a scanned matrix of small lasers to detect an interruption to the beam (by sticking fingers into the beam!). The interruption is detected by a phototransistor which feeds an analogue level amplifier and a digital comparator. A microcontroller (a Raspberry Pi Pico 2) runs CircuitPython code to detect the interruption, identify which laser is on at the time, makes appropriate adjustments depending on the selected scale, velocity, bend value and transposition, and them emits MIDI messages to whatever device is on the end. 
+The eHarp is based on a scanned matrix of small lasers to detect an interruption to the beam (by sticking fingers into the beam!). The interruption is detected by a phototransistor which feeds an baseline-compensated analogue level amplifier and a digital comparator. A microcontroller (a Raspberry Pi Pico 2) runs CircuitPython code to detect the interruption, identify which laser is on at the time, makes appropriate adjustments depending on the selected scale, velocity, bend value and transposition, and them emits MIDI messages to whatever device is on the end. 
 
 The lasers are small 5mW diodes (such as are used in laser pointers), scanned sequentially by the microcontroller. Only "active" diodes are scanned, so any which are not part of the scale, or that have been identified as blocked or faulty by the calibration routines are not illuminated and are skipped from the scan. This reduces any latency in generating notes, as well as preventing spurious notes playing.
 
 ## Boot and run sequences
 ### Boot up and calibration
-On initially powering the eHarp up, the (numerous) I/O ports are initialised and the offset output set to a default value of approximately 150mV. A flag is set to prevent any MIDI output (this stops random notes playing during calibration). A nice splash screen is displayed for a few seconds. This serves no purpose other than being flash, and can be aborted by pressing any button on the menu panel. The software twiddles it's little digital thumbs while this is displayed.
-Once the splash expires, the eHarp drops into it's automated calibration routine. There are two elements to this. Firstly the offset is adjusted to allow for the current ambient light by reading the sensor output (post amplification) with no lasers on. The offset voltage is adjusted to approximately 30-50mV above zero to give a bit of stability. 
+On initially powering the eHarp up, the (numerous) I/O ports are initialised and the baseline offset output set to a default value of approximately 150mV. A flag is set to prevent any MIDI output (this stops random notes playing during calibration). A nice splash screen is displayed for a few seconds. This serves no purpose other than being flash, and can be aborted by pressing any button on the menu panel. The software twiddles it's little digital thumbs while this is displayed.
+Once the splash expires, the eHarp drops into it's automated calibration routine. There are two elements to this. Firstly the baseline offset is adjusted to allow for the current ambient light by reading the sensor output (post amplification) with no lasers on. The offset voltage is adjusted to approximately 30-50mV above zero to give a bit of stability. 
 Following the offset adjustment, all the lasers are scanned to check that they are producing an output and that the sensor is detecting them. (This assumes that there are no fingers in the way for this part!) Any which fail for any reason (poor and failing output - always a danger with cheap laser diodes! - misalignments or blockages, etc.) are marked as inactive and removed from normal scans. 
 Finally, the main menu is displayed and the main scan routines are initiated.
 
