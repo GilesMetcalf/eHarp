@@ -1,5 +1,14 @@
 # eHarp in CircuitPython
 
+# +-------------------------------+
+# |   *** eHarp v2.0 Project ***  |
+# |                               |
+# | Author:         Gil Metcalf   |
+# | Code version:   2.10.8        |
+# | Date:           28-Jun-2026   |
+# | Licence :       GPL v3.0      |
+# +-------------------------------+
+
 import board
 import displayio
 import terminalio
@@ -16,6 +25,7 @@ from adafruit_midi.note_on import NoteOn
 from adafruit_midi.note_off import NoteOff
 from adafruit_midi.pitch_bend import PitchBend
 from adafruit_midi.control_change import ControlChange
+import config
 
 # +------------------------------+
 # | Constants and menu constants |
@@ -63,6 +73,7 @@ col_s2 = digitalio.DigitalInOut(board.GP8)
 col_s2.direction = digitalio.Direction.OUTPUT
 scan_in = digitalio.DigitalInOut(board.GP17)
 scan_in.direction = digitalio.Direction.INPUT
+scan_in.pull = digitalio.Pull.UP
 lsr_enbl = digitalio.DigitalInOut(board.GP9)
 lsr_enbl.direction = digitalio.Direction.OUTPUT
 
@@ -71,30 +82,22 @@ baseline_in = analogio.AnalogIn(board.A0)
 baseline_out = pwmio.PWMOut(board.GP18, frequency=500)
 
 # Scanning constants
-num_notes = 32
-num_rows = 6
-num_cols = 6
-note_on_logic = 0 # input value for "on" note
+num_notes = config.NUM_NOTES
+# num_rows = 6
+# num_cols = 6
+# note_on_logic = 1 # input value for "on" note
 output_enable = False # Disable MIDI note generation for setup and calibration
 
 # Calibration and diagnostics constants
-calibration_scans = 10 
-slow_scan_count = 5   # number of cycles for slow scan
-slow_scan_speed = 0.25  # number of seconds for each step in slow scan
-dcmv_ratio = 10   # Duty cycle to mV ration for baseline control
-base_offset = 20  # Offset to set baseline value. Should be slightly above 0mV
-base_settle = 0.01  # Baseline ADC settle time in seconds
-initial_baseline = 150  # Initial baseline output value on boot
+# calibration_scans = 10 
+# slow_scan_count = 5   # number of cycles for slow scan
+# slow_scan_speed = 0.25  # number of seconds for each step in slow scan
+# dcmv_ratio = 10   # Duty cycle to mV ration for baseline control
+# base_offset = 20  # Offset to set baseline value. Should be slightly above 0mV
+# base_settle = 0.01  # Baseline ADC settle time in seconds
+# initial_baseline = 150  # Initial baseline output value on boot
 
-# Menu constants
-len_main = 3
-len_scale = 23
-len_tuning = 13
-len_channel = 11
-display_window = 10
-current_top = 0
-current_menu = 0
-current_pointer = 0
+# Menu handling constants
 button_pressed = [0,0,0,0]
 last_button_state = [0,0,0,0]
 
@@ -139,7 +142,7 @@ channel = ["0", "1", "2", "3", "4", "5", "6", "7", "8", "9", "10"]
 
 velocity = ["8", "16", "24", "32", "48", "64","72", "80", "96", "112", "127"]
 
-system_menu = ["Calibration", "SlowScan", "Single Step"]
+system_menu = ["Calibration", "Slow Scan", "Single Step", "Mute lasers"]
 
 # Mapping scales
 scale_map = [
@@ -170,10 +173,10 @@ scale_map = [
 
 # MIDI constants and variables
 midi = adafruit_midi.MIDI(midi_out=usb_midi.ports[1], out_channel=state_channel)
-midi_offset = 48
-ignore_jitter = 500
-max_octave = 3
-min_octave = -3
+# midi_offset = 48
+# ignore_jitter = 500
+# max_octave = 3
+# min_octave = -3
 current_octave = 0
 last_octave_up = 0
 last_octave_down = 0
@@ -184,15 +187,16 @@ note_active = [0 for i in range(num_notes)]
 note_valid = [1 for i in range(num_notes)]
 
 # Display constants
-display_width = 128
-display_height = 128
-display_offset = 0  # Needed for this particular oLED display
+# display_width = 128
+# display_height = 128
+# display_offset = 0  # Needed for this particular oLED display
 displayio.release_displays()
 i2c = busio.I2C(board.GP5, board.GP4)  # Update pins if needed
 display_bus = displayio.I2CDisplay(i2c, device_address=0x3C)
-display = adafruit_displayio_sh1107.SH1107(display_bus, width=display_width, height=display_height, display_offset=display_offset)
-display.rotation = 180
-splash_time = 6  # Splashscreen display time (secs)
+display = adafruit_displayio_sh1107.SH1107(display_bus, width=config.DISPLAY_WIDTH, height=config.DISPLAY_HEIGHT, display_offset=config.DISPLAY_OFFSET)
+display.rotation = config.DISPLAY_ROTATION
+# splash_time = 6  # Splashscreen display time (secs)
+display_window = config.DISPLAY_WINDOW
 
 
 # +----------------------+
@@ -206,8 +210,8 @@ def selectMuxChannel(s0, s1, s2, mux):
 
 def selectLaser(cell):
   # Select and turn on the selected laser
-  row = cell % num_rows
-  col = cell // num_rows
+  row = cell % config.NUM_ROWS
+  col = cell // config.NUM_ROWS
   lsr_enbl.value = 0
   selectMuxChannel(row_s0, row_s1, row_s2, row)
   selectMuxChannel(col_s0, col_s1, col_s2, col)
@@ -215,25 +219,27 @@ def selectLaser(cell):
 
 def set_baseline():
   lsr_enbl.value = 0
-  for _ in range(calibration_scans):
-    base_mv = baseline_in.value / dcmv_ratio
-    time.sleep(base_settle)
-    if base_mv > base_offset:
-      offset = base_mv - base_offset
-      baseline_out.duty_cycle = offset * dcmv_ratio
+  for _ in range(config.CALIBRATION_SCANS):
+    base_mv = baseline_in.value / config.DCMV_RATIO
+    time.sleep(config.BASE_SETTLE)
+    if base_mv > config.BASE_OFFSET:
+      offset = base_mv - config.BASE_OFFSET
+      baseline_out.duty_cycle = int(offset * config.DCMV_RATIO)
 
 def checkForValidNotes():
-  print("Got to calibration function")
-  global note_valid, output_enable
+  global note_valid, note_active, output_enable
+    # Reset everything
+  note_active = [0 for i in range(num_notes)]
+  note_valid = [1 for i in range(num_notes)]
     # Loop around the array and look for blocked/non-working lasers
     # Non-working notes will be ignored in scans so that they don't play continuously.
   output_enable = False
-  for _ in range(calibration_scans):
+  for _ in range(config.CALIBRATION_SCANS):
     for cell in range(0,num_notes):
       selectLaser(cell)
       time.sleep(0.001) # Settle time
       current_sensor = scan_in.value
-      if current_sensor == note_on_logic:   # Laser is not reaching the sensor
+      if current_sensor == config.NOTE_ON_LOGIC:   # Laser is not reaching the sensor
         note_valid[cell] = 0    # Mark the note as dead
       else:
         note_valid[cell] = 1    # Mark the note as working
@@ -252,29 +258,26 @@ def scanMatrix():
         selectLaser(cell)
         # time.sleep(0.001) # Settle time
         current_sensor = scan_in.value
-        print("Read {} for note {}".format (current_sensor, cell))
-        if (current_sensor == note_on_logic and note_active[cell] == 0):
+        if (current_sensor == config.NOTE_ON_LOGIC and note_active[cell] == 0):
           note_active[cell] = 1
           testScale(cell)
-        elif (current_sensor != note_on_logic and note_active[cell] == 1):
+        elif (current_sensor != config.NOTE_ON_LOGIC and note_active[cell] == 1):
           note_active[cell] = 0
           releaseNote(cell)
 
 def slow_scan():
-  print("Got to slow scan function")
   # Slowly cycle round all lasers
   global output_enable
   output_enable = False
-  for _ in range(0,slow_scan_count):
+  for _ in range(0,config.SLOW_SCAN_COUNT):
     for cell in range(0,num_notes):
       selectLaser(cell)
-      time.sleep(slow_scan_speed)
+      time.sleep(config.SLOW_SCAN_SPEED)
   # Back to main menu
   output_enable = True
   go_back()
 
 def single_step():
-  print("Got to single step function")
   # Manually step through lasers
   global last_button_state
   this_step = 0
@@ -300,6 +303,25 @@ def single_step():
     lsr_enbl.value = 0  # Turn off any lasers
   go_back()
 
+def mute_lasers():
+  # Turn lasers off for up to 1 minute
+  global output_enable
+  output_enable = False
+  lsr_enbl.value = 0
+  start_time = time.monotonic()
+  while time.monotonic() - start_time < config.MAX_MUTE_TIME:  # Press any button to continue...
+    if not button_up.value:
+      break
+    if not button_dn.value:
+      break
+    if not button_sel.value:
+      break
+    if not button_bck.value:
+      break
+    time.sleep(0.05)
+  output_enable = True
+  lsr_enbl.value = 1
+
 
 # +--------------------------+
 # | Scale and MIDI functions |
@@ -308,28 +330,24 @@ def set_scale(index):
   global state_scale
   state_scale = index
   scale_menu.pointer = index
-  print("Current scale:", scales[state_scale])
   go_back()
 
 def set_tune(index):
   global state_tune
   state_tune = index
   tuning_menu.pointer = index
-  print("Current tuning:", tuning[state_scale])
   go_back()
 
 def set_velocity(index):
   global state_velocity
   state_velocity = index
   velocity_menu.pointer = index
-  print("Current velocity:", velocity[state_velocity])
   go_back()
 
 def set_channel(index):
   global state_channel
   state_channel = index
   channel_menu.pointer = index
-  print("Current channel:", channel[state_channel])
   go_back()
 
 
@@ -379,10 +397,11 @@ velocity_menu = Menu(
     for i, velocity_value in enumerate(velocity)
   ], state_velocity)
 
-system_menu = Menu("System", [
+system_menu = Menu("Diagnostics", [
   MenuItem("Calibration", action=calibrate),
   MenuItem("Slow Scan", action=slow_scan),
-  MenuItem("Single Step", action=single_step)
+  MenuItem("Single Step", action=single_step),
+  MenuItem("Mute lasers", action=mute_lasers)
 ])
 
 main_menu = Menu("Main", [
@@ -390,19 +409,19 @@ main_menu = Menu("Main", [
   MenuItem("Tuning", submenu=tuning_menu),
   MenuItem("MIDI Channel", submenu=channel_menu),
   MenuItem("Velocity", submenu=velocity_menu),
-  MenuItem("System", submenu=system_menu)
+  MenuItem("Diagnostics", submenu=system_menu)
 ])
 
 menu_stack = [main_menu]
 
 def show_splash():
   splash_group = displayio.Group()
-  bitmap = displayio.OnDiskBitmap("/logo.bmp")
+  bitmap = displayio.OnDiskBitmap(config.LOGO_FILE)
   tile_grid = displayio.TileGrid(bitmap, pixel_shader=bitmap.pixel_shader, x=0, y=-10)
   splash_group.append(tile_grid)
   display.root_group = splash_group
   start_time = time.monotonic()
-  while time.monotonic() - start_time < splash_time:  # Press any button to continue...
+  while time.monotonic() - start_time < config.SPLASH_TIME:  # Press any button to continue or timeout..
     if not button_up.value:
       break
     if not button_dn.value:
@@ -528,7 +547,7 @@ def get_channel():
   return int(channel[state_channel])-1
 
 def getNote(note):
-  pitch = note + midi_offset
+  pitch = note + config.MIDI_OFFSET
   pitch = pitch + get_tuning()
   pitch = pitch + (12 * state_octave)
   return pitch
@@ -569,8 +588,8 @@ def test_midi_controls():
   current_octave_button_up = button_oct_up.value
   if last_octave_up == 0 and current_octave_button_up == 0:
     current_octave = current_octave + 1
-    if current_octave > max_octave:
-      current_octave = max_octave
+    if current_octave > config.MAX_OCTAVE:
+      current_octave = config.MAX_OCTAVE
     state_octave = current_octave
     last_octave_up = 1
   if last_octave_up == 1 and current_octave_button_up == 1:
@@ -579,8 +598,8 @@ def test_midi_controls():
   current_octave_button_dn = button_oct_dn.value
   if last_octave_down == 0 and current_octave_button_dn == 0:
     current_octave=  current_octave - 1
-    if current_octave < min_octave:
-      current_octave = min_octave
+    if current_octave < config.MIN_OCTAVE:
+      current_octave = config.MIN_OCTAVE
     state_octave = current_octave
     last_octave_down = 1
   if last_octave_down == 1 and current_octave_button_dn == 1:
@@ -596,12 +615,13 @@ def test_midi_controls():
 
   # Read pots and send mod / bend commands
   mod_value = 32768 - (mod_in.value/2)
-  if (mod_value != last_mod) and abs(mod_value - last_mod) > ignore_jitter:
+  if (mod_value != last_mod) and abs(mod_value - last_mod) > config.IGNORE_JITTER:
     last_mod = mod_value
     conv_mod_value = int(abs(mod_value - 16384)/128)
     modChange(conv_mod_value)
+
   bend_value = int(32768 - (bend_in.value/2))
-  if (bend_value != last_bend) and abs(bend_value - last_bend) > ignore_jitter:
+  if (bend_value != last_bend) and abs(bend_value - last_bend) > config.IGNORE_JITTER:
     last_bend = bend_value
     bend(bend_value/2)
 
@@ -610,7 +630,7 @@ def test_midi_controls():
 ################################
 
 # Initial setup stuff and boot sequence
-baseline_out.duty_cycle = initial_baseline
+baseline_out.duty_cycle = config.INITIAL_BASELINE
 output_enable = False
 show_splash()
 calibrate()
