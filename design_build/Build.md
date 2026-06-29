@@ -6,6 +6,8 @@ This is not a detailed construction guide, more a loose description of the appro
 The main body of the eHarp is built from four layers of ply. Two sheets of 600x1220mm ply were obtained from my local DIY store; a sheet of 12mm and a sheet of 20mm. I could get two 
 body sections from each sheet (see cutting_plan.svg for the layout). These can be cut out with a jigsaw; I used a *big* bandsaw (you won't be able to do it with a small benchtop bandsaw!). It is also easier to make a template from some light ply for marking this out. The template has a couple of functions; it ensures that all your ply sections are the same shape and size, and it also comes in useful later one when you are aligning all those little laser diodes in the array. More on that later.
 The 12mm sections form the inner core of the body. Before gluing them together, cut out the rectangular openings marked in red on the diagram for the controls - note that the larger opening is on one section only! Glue and clamp.
+![(image) Body glued and clamped][body_clamp]
+
 Cut out the outer sections from the 20mm ply in the same way. Put them aside until later.
 Once the core is glued, cut out a section for the laser array on the longer arm (keep the bit you cut out - you'll need it later), and a section for the sensor at the end of the shorter arm. Again, these are marked in red on the diagram. Use a router to cut channels for the cables for the laser array and the sensor to the electronics bay (the larger opening) in the core section.
 
@@ -26,6 +28,9 @@ Remember I said that that plywood template would come in useful? Clamp or use do
 
 The array can be wired. The leads from the diodes are very thin and flimsy, so it is worth keeping them as short as possible, and don't connect them directly to any flying leads for connecion to the main board. Provide some fixed connection points next to the diodes and use those. I found some small copper tacks that worked admirably. If using tacks like this, drill the wood with a small drill and push them in - don't hammer them! Complete the wiring with ribbon cable, and leave enough to reach the main board easily.
 
+![(image) Laser array diodes in place][array_wired]
+![(image) Laser array wired up][array_connected]
+
 ## The sensor
 The laser sensor is a bit simpler to put together. It was made from a stack of four units cut from 6mm clear acrylic (there is a template in the drawings). Once cut, the segments were glued together using UV-curing glue, and clamped before curing to remove any air bubbles. Once glued, the stack was sanded down to 8000 grit and then polished with cutting compound to get a glassy finish.
 In order to maximise light capture it is worth putting some sort of reflective finish on all faces except the front-facing curved face. I used silver leaf, but a reflective silver paint will work too. Mask off the front face before gilding/painting to prevent anything getting on that face.
@@ -41,6 +46,7 @@ Again, flying ribbon cables should be attached with sufficient length to reach t
 
 ## The main board
 All the circuitry was built on one prototyping board (well, it was a prototype!) that fits into the electorincs bay. Again, it would be nicer to use a proper PCB, but this has been through many iterations and I did not want a huge pile of useless boards cluttering up my workshop!
+![(image) The mainboard][mainboard]
 
 ## Assembly
 The sensor was placed in the short arm of the eHarp, and glued in place using 2-part epoxy.
@@ -48,11 +54,20 @@ The sensor was placed in the short arm of the eHarp, and glued in place using 2-
 The cables for the laser array were drawn through the channel using the previously placed cord, and then the array located in place so that the lowest note (first laser in the array) is towards the base of the harp, and the highest at the top end of the arm. The array is lightly placed initially, as it may need to be repositioned slightly to aim them at the sensor correctly.
 The various panels are put in place and secured with small brass screws. All the leads are brought out to the electronics bay (which is now sprouting a bewildering nest of cables! You *did* mark them before putting everything in place, didn't you?).
 
-Finally, the main board is connected and nestled in the electronics bay. Connect up the USB cable to a supply and let it boot up. Once it has finished booting, use the Slow Scan option in the Diagnostics menu to finish aligning the laser array. It can be pressed into place, and secured with a drop of glue if necessary (it should be a tight push fit, and not need glue).
+Finally, the main board is connected and nestled in the electronics bay. 
+![(image) The mainboard in place][board_placed]
+Connect up the USB cable to a supply and let it boot up. Once it has finished booting, use the Slow Scan option in the Diagnostics menu to finish aligning the laser array. It can be pressed into place, and secured with a drop of glue if necessary (it should be a tight push fit, and not need glue).
 
 ## Final adjustment
 There is one small adjustment that will be needed, and this will require an oscilloscope or a logic analyser. This should be attached to the output of the LM393 comparator (U5 on the schematic). Select Mute Lasers from the Diagnostics menu (this will turn off all the lasers) and set RV1 to give a LOW output.
 Now select Slow Scan from the Diagnostics menu and tweak RV1 to give a HIGH output for each laser.
+
+[body_clamp]: https://github.com/GilesMetcalf/eHarp/tree/main/design_build/images/body_clamped.png "(image) Body glued and clamped"
+[array_wired]: https://github.com/GilesMetcalf/eHarp/tree/main/design_build/images/array_wired.png "(image) Laser array diodes in place"
+[array_connected]: https://github.com/GilesMetcalf/eHarp/tree/main/design_build/images/array_connected.png "(image) Laser array wired up"
+[mainboard]: https://github.com/GilesMetcalf/eHarp/tree/main/design_build/images/bare_maiboard.png "(image) The mainboard"
+[board_placed]: https://github.com/GilesMetcalf/eHarp/tree/main/design_build/images/board_in_place.png "(image) The mainboard in place"
+
 
 You're all done! All that is needed is a cover over the electronics bay. I used a small piece of 3mm ply, coloured to match the rest of the body, and secured with small brass screws.
 Connect it to your favourite DAW or VST host and enjoy!
