@@ -16,6 +16,7 @@ NUM_NOTES = 32              # Number of notes avaiable on the eHarp
 NUM_ROWS = 6                # Number of laser anodes to scan in matrix
 NUM_COLS = 6                # Number of laser cathodes to scan in matrix
 NOTE_ON_LOGIC = True        # input state for "on" note
+LASER_SETTLE = 0.0025        # Settle time between laser on and reading input
 
 # Calibration and diagnostics constants
 CALIBRATION_SCANS = 10      # Number of scans for calibration cycle

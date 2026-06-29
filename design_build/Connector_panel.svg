@@ -1,0 +1,119 @@
+<?xml version="1.0" encoding="UTF-8" standalone="no"?>
+<!-- Created with Inkscape (http://www.inkscape.org/) -->
+
+<svg
+   width="122.00605mm"
+   height="100.0321mm"
+   viewBox="0 0 122.00605 100.0321"
+   version="1.1"
+   id="svg963"
+   inkscape:version="1.1.2 (0a00cf5339, 2022-02-04)"
+   sodipodi:docname="Connector_panel.svg"
+   xmlns:inkscape="http://www.inkscape.org/namespaces/inkscape"
+   xmlns:sodipodi="http://sodipodi.sourceforge.net/DTD/sodipodi-0.dtd"
+   xmlns="http://www.w3.org/2000/svg"
+   xmlns:svg="http://www.w3.org/2000/svg">
+  <sodipodi:namedview
+     id="namedview965"
+     pagecolor="#ffffff"
+     bordercolor="#666666"
+     borderopacity="1.0"
+     inkscape:pageshadow="2"
+     inkscape:pageopacity="0.0"
+     inkscape:pagecheckerboard="0"
+     inkscape:document-units="mm"
+     showgrid="false"
+     inkscape:zoom="2.9576319"
+     inkscape:cx="154.51551"
+     inkscape:cy="188.66445"
+     inkscape:window-width="2880"
+     inkscape:window-height="1592"
+     inkscape:window-x="1920"
+     inkscape:window-y="0"
+     inkscape:window-maximized="1"
+     inkscape:current-layer="layer1"
+     fit-margin-top="0"
+     fit-margin-left="0"
+     fit-margin-right="0"
+     fit-margin-bottom="0" />
+  <defs
+     id="defs960" />
+  <g
+     inkscape:label="Layer 1"
+     inkscape:groupmode="layer"
+     id="layer1"
+     transform="translate(-58.38434,-62.359037)">
+    <rect
+       style="fill:none;stroke:#ff0000;stroke-width:0.100979;stroke-linecap:round"
+       id="rect2649"
+       width="59.899021"
+       height="99.899017"
+       x="58.43483"
+       y="62.409527"
+       ry="3.951422"
+       rx="4.0664873" />
+    <rect
+       style="fill:none;stroke:#ff0000;stroke-width:0.140186;stroke-linecap:round"
+       id="rect1059"
+       width="10.859814"
+       height="13.859815"
+       x="93.83699"
+       y="80.124268"
+       ry="1.3340687"
+       rx="1.3307379" />
+    <circle
+       style="fill:none;stroke:#ff0000;stroke-width:0.23864;stroke-linecap:round"
+       id="path2615"
+       cx="99.532616"
+       cy="115.31347"
+       r="5.8806796" />
+    <circle
+       style="fill:none;stroke:#ff0000;stroke-width:0.318187;stroke-linecap:round"
+       id="circle6283"
+       cx="99.730209"
+       cy="139.32104"
+       r="7.8409066" />
+    <circle
+       style="fill:none;stroke:#ff0000;stroke-width:0.23864;stroke-linecap:round"
+       id="circle8985"
+       cx="76.273689"
+       cy="115.18203"
+       r="5.8806796" />
+    <rect
+       style="fill:none;stroke:#ff0000;stroke-width:0.100979;stroke-linecap:round"
+       id="rect9993"
+       width="59.899021"
+       height="99.899017"
+       x="120.44088"
+       y="62.441631"
+       ry="3.951422"
+       rx="4.0664873" />
+    <rect
+       style="fill:none;stroke:#ff0000;stroke-width:0.140186;stroke-linecap:round"
+       id="rect9995"
+       width="10.859814"
+       height="13.859815"
+       x="155.84303"
+       y="80.156372"
+       ry="1.3340687"
+       rx="1.3307379" />
+    <circle
+       style="fill:none;stroke:#ff0000;stroke-width:0.23864;stroke-linecap:round"
+       id="circle9997"
+       cx="161.53867"
+       cy="115.34557"
+       r="5.8806796" />
+    <circle
+       style="fill:none;stroke:#ff0000;stroke-width:0.318187;stroke-linecap:round"
+       id="circle9999"
+       cx="161.73625"
+       cy="139.35315"
+       r="7.8409066" />
+    <circle
+       style="fill:none;stroke:#ff0000;stroke-width:0.23864;stroke-linecap:round"
+       id="circle10001"
+       cx="138.27974"
+       cy="115.21413"
+       r="5.8806796" />
+  </g>
+</svg>

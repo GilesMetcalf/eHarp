@@ -1,5 +1,6 @@
 .vscode/
 circuitpy/
 lib/
+working/
 
 *.code-workspace

@@ -83,19 +83,7 @@ baseline_out = pwmio.PWMOut(board.GP18, frequency=500)
 
 # Scanning constants
 num_notes = config.NUM_NOTES
-# num_rows = 6
-# num_cols = 6
-# note_on_logic = 1 # input value for "on" note
 output_enable = False # Disable MIDI note generation for setup and calibration
-
-# Calibration and diagnostics constants
-# calibration_scans = 10 
-# slow_scan_count = 5   # number of cycles for slow scan
-# slow_scan_speed = 0.25  # number of seconds for each step in slow scan
-# dcmv_ratio = 10   # Duty cycle to mV ration for baseline control
-# base_offset = 20  # Offset to set baseline value. Should be slightly above 0mV
-# base_settle = 0.01  # Baseline ADC settle time in seconds
-# initial_baseline = 150  # Initial baseline output value on boot
 
 # Menu handling constants
 button_pressed = [0,0,0,0]
@@ -173,10 +161,6 @@ scale_map = [
 
 # MIDI constants and variables
 midi = adafruit_midi.MIDI(midi_out=usb_midi.ports[1], out_channel=state_channel)
-# midi_offset = 48
-# ignore_jitter = 500
-# max_octave = 3
-# min_octave = -3
 current_octave = 0
 last_octave_up = 0
 last_octave_down = 0
@@ -187,15 +171,11 @@ note_active = [0 for i in range(num_notes)]
 note_valid = [1 for i in range(num_notes)]
 
 # Display constants
-# display_width = 128
-# display_height = 128
-# display_offset = 0  # Needed for this particular oLED display
 displayio.release_displays()
 i2c = busio.I2C(board.GP5, board.GP4)  # Update pins if needed
 display_bus = displayio.I2CDisplay(i2c, device_address=0x3C)
 display = adafruit_displayio_sh1107.SH1107(display_bus, width=config.DISPLAY_WIDTH, height=config.DISPLAY_HEIGHT, display_offset=config.DISPLAY_OFFSET)
 display.rotation = config.DISPLAY_ROTATION
-# splash_time = 6  # Splashscreen display time (secs)
 display_window = config.DISPLAY_WINDOW
 
 
@@ -237,7 +217,7 @@ def checkForValidNotes():
   for _ in range(config.CALIBRATION_SCANS):
     for cell in range(0,num_notes):
       selectLaser(cell)
-      time.sleep(0.001) # Settle time
+      time.sleep(config.LASER_SETTLE) # Settle time
       current_sensor = scan_in.value
       if current_sensor == config.NOTE_ON_LOGIC:   # Laser is not reaching the sensor
         note_valid[cell] = 0    # Mark the note as dead
@@ -256,7 +236,7 @@ def scanMatrix():
   for cell in range(0,num_notes):
       if scale_map[state_scale][cell] == 1 and note_valid[cell] == 1:
         selectLaser(cell)
-        # time.sleep(0.001) # Settle time
+        time.sleep(config.LASER_SETTLE) # Settle time
         current_sensor = scan_in.value
         if (current_sensor == config.NOTE_ON_LOGIC and note_active[cell] == 0):
           note_active[cell] = 1
