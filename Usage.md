@@ -8,7 +8,7 @@ Although the laser diodes are relatively low power (<5mW), they are still suffic
 There are a number of menus available that allow the user to select various settings for playing, as well as giving access to some diagnostic and calibration features.
 
 ### Scales menu
-There are 32 different scales or modes that can be selected from the **Scales** menu:
+There are 23 different scales or modes that can be selected from the **Scales** menu:
 - Chromatic
 - Major
 - Minor
@@ -38,7 +38,7 @@ Selecting one of these modes will restrict the MIDI output to only notes within 
 ### Tuning menu
 The eHarp is naturally tuned to C (that is, the lowest note is C3). The tuning menu will allow transposition to any other key in semitones. That will also apply to any mode or scale that has been selected.
 
-### Channel mneu
+### Channel menu
 This control selects the MIDI channel that messages are output on. By default, this is set to channel 0, but any channel up to 10 can be selected. Currently, it is not possible to select "all", although this may be implemented in the future.
 
 ### Velocity menu
