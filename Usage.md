@@ -7,6 +7,17 @@ Although the laser diodes are relatively low power (<5mW), they are still suffic
 ## The menus
 There are a number of menus available that allow the user to select various settings for playing, as well as giving access to some diagnostic and calibration features.
 
+### Save and Load menu
+The user can store up to 8 sets of parameters, and recall them as needed. The parameters stored are:
+- Scale / mode
+- MIDI channel
+- Velocity
+- Transpositions
+- Octave
+
+When selecting one of these option, there are 8 slots labelled Song 1 through to Song 8. Each can hold a different set of parameters. 
+Note that selecting to save in a slot that has been used before will overwrite any existing parameters.
+
 ### Scales menu
 There are 32 different scales or modes that can be selected from the **Scales** menu:
 - Chromatic
