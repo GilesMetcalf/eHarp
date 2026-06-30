@@ -26,6 +26,7 @@ from adafruit_midi.note_off import NoteOff
 from adafruit_midi.pitch_bend import PitchBend
 from adafruit_midi.control_change import ControlChange
 import config
+import json
 
 # +------------------------------+
 # | Constants and menu constants |
@@ -91,11 +92,13 @@ last_button_state = [0,0,0,0]
 
 # State values
 state_menu = 0
-state_scale = 0
-state_tune = 6
-state_channel = 1
-state_octave = 0
-state_velocity = 6
+settings = {
+  "scale": 0,
+  "tune": 6,
+  "channel": 1,
+  "octave": 0,
+  "velocity": 6
+}
 
 # Menus
 scales = [
@@ -160,7 +163,7 @@ scale_map = [
 ]
 
 # MIDI constants and variables
-midi = adafruit_midi.MIDI(midi_out=usb_midi.ports[1], out_channel=state_channel)
+midi = adafruit_midi.MIDI(midi_out=usb_midi.ports[1], out_channel=settings["channel"])
 current_octave = 0
 last_octave_up = 0
 last_octave_down = 0
@@ -234,7 +237,7 @@ def calibrate():
 def scanMatrix():
   # global note_valid, state_scale
   for cell in range(0,num_notes):
-      if scale_map[state_scale][cell] == 1 and note_valid[cell] == 1:
+      if scale_map[settings["scale"]][cell] == 1 and note_valid[cell] == 1:
         selectLaser(cell)
         time.sleep(config.LASER_SETTLE) # Settle time
         current_sensor = scan_in.value
@@ -303,33 +306,30 @@ def mute_lasers():
   lsr_enbl.value = 1
 
 
-# +--------------------------+
-# | Scale and MIDI functions |
-# +--------------------------+
-def set_scale(index):
-  global state_scale
-  state_scale = index
-  scale_menu.pointer = index
-  go_back()
+# +-------------------------+
+# | Save and Load functions |
+# +-------------------------+
 
-def set_tune(index):
-  global state_tune
-  state_tune = index
-  tuning_menu.pointer = index
-  go_back()
+# Generic setter
+def set_setting(name, value):
+  global settings
+  settings[name] = value
 
-def set_velocity(index):
-  global state_velocity
-  state_velocity = index
-  velocity_menu.pointer = index
-  go_back()
+def save_song(song):
+  with open(f"/song_{song}.json", "w") as f:
+    json.dump(settings, f)
 
-def set_channel(index):
-  global state_channel
-  state_channel = index
-  channel_menu.pointer = index
-  go_back()
+def load_song(song):
+  global settings
+  with open(f"/song_{song}.json") as f:
+    settings.update(json.load(f))
+  sync_menus()
 
+def sync_menus():
+    scale_menu.pointer = settings["scale"]
+    tuning_menu.pointer = settings["tune"]
+    channel_menu.pointer = settings["channel"]
+    velocity_menu.pointer = settings["velocity"]
 
 # +----------------------------+
 # | Menu and display functions |
@@ -352,30 +352,51 @@ class MenuItem:
 scale_menu = Menu(
   "Scales",
   [MenuItem(
-    scale_name, action=lambda idx=i: set_scale(idx))
+    scale_name, action=lambda idx=i: set_setting("scale", idx))
     for i, scale_name in enumerate(scales)
-  ], state_scale)
+  ], settings["scale"])
 
 tuning_menu = Menu(
   "Tuning",
   [MenuItem(
-    tuning_value, action=lambda idx=i: set_tune(idx))
+    tuning_value, action=lambda idx=i: set_setting("tune", idx))
     for i, tuning_value in enumerate(tuning)
-  ], state_tune)
+  ], settings["tune"])
 
 channel_menu = Menu(
   "Channel",
   [MenuItem(
-    channel_value, action=lambda idx=i: set_channel(idx))
+    channel_value, action=lambda idx=i: set_setting("channel", idx))
     for i, channel_value in enumerate(channel)
-  ], state_channel)
+  ], settings["channel"])
 
 velocity_menu = Menu(
   "Velocity",
   [MenuItem(
-    velocity_value, action=lambda idx=i: set_velocity(idx))
+    velocity_value, action=lambda idx=i: set_setting("velocity", idx))
     for i, velocity_value in enumerate(velocity)
-  ], state_velocity)
+  ], settings["velocity"])
+
+save_song_menu = Menu(
+  "Save song",
+  [MenuItem(
+    f"Song {i}", action=lambda idx=i: save_song(idx))
+    for i in range(1,config.MAX_SAVE_SLOTS + 1)
+  
+  ], 0)
+
+load_song_menu = Menu(
+  "Load song",
+  [MenuItem(
+    f"Song {i}", action=lambda idx=i: load_song(idx))
+    for i in range(1,config.MAX_SAVE_SLOTS + 1)
+  
+  ], 0)
+
+save_menu = Menu("Save / Load", [
+  MenuItem("Save song", submenu=save_song_menu),
+  MenuItem("Load song", submenu=load_song_menu),  
+])
 
 system_menu = Menu("Diagnostics", [
   MenuItem("Calibration", action=calibrate),
@@ -385,6 +406,7 @@ system_menu = Menu("Diagnostics", [
 ])
 
 main_menu = Menu("Main", [
+  MenuItem("Save / Load", submenu=save_menu),
   MenuItem("Scale / Mode", submenu=scale_menu),
   MenuItem("Tuning", submenu=tuning_menu),
   MenuItem("MIDI Channel", submenu=channel_menu),
@@ -518,18 +540,18 @@ def test_menu_buttons():
 # +----------------+
 
 def get_tuning():
-  return int(tuning[state_tune])
+  return int(tuning[settings["tune"]])
 
 def get_velocity():
-  return int(velocity[state_velocity])
+  return int(velocity[settings["velocity"]])
 
 def get_channel():
-  return int(channel[state_channel])-1
+  return int(channel[settings["channel"]])
 
 def getNote(note):
   pitch = note + config.MIDI_OFFSET
   pitch = pitch + get_tuning()
-  pitch = pitch + (12 * state_octave)
+  pitch = pitch + (12 * settings["octave"])
   return pitch
 
 def playNote(in_pitch):
@@ -540,9 +562,9 @@ def releaseNote(in_pitch):
   midi.send(NoteOff(getNote(in_pitch), 0), get_channel())
 
 def testScale(note):
-  if scale_map[state_scale][note] == 1:
+  if scale_map[settings["scale"]][note] == 1:
     playNote(note)
-  elif scale_map[state_scale][note] == 0 and note_active[note] == 1:
+  elif scale_map[settings["scale"]][note] == 0 and note_active[note] == 1:
     releaseNote(note)
 
 def sustainOn():
@@ -564,13 +586,13 @@ def bend(bend_val):
 
 def test_midi_controls():
   global last_octave_up, last_octave_down, last_bend, last_mod, last_sustain
-  global current_octave, state_octave
+  global current_octave, settings
   current_octave_button_up = button_oct_up.value
   if last_octave_up == 0 and current_octave_button_up == 0:
     current_octave = current_octave + 1
     if current_octave > config.MAX_OCTAVE:
       current_octave = config.MAX_OCTAVE
-    state_octave = current_octave
+    settings["octave"] = current_octave
     last_octave_up = 1
   if last_octave_up == 1 and current_octave_button_up == 1:
     last_octave_up = 0
@@ -580,7 +602,7 @@ def test_midi_controls():
     current_octave=  current_octave - 1
     if current_octave < config.MIN_OCTAVE:
       current_octave = config.MIN_OCTAVE
-    state_octave = current_octave
+    settings["octave"] = current_octave
     last_octave_down = 1
   if last_octave_down == 1 and current_octave_button_dn == 1:
     last_octave_down = 0

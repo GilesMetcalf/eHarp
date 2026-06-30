@@ -42,3 +42,6 @@ DISPLAY_ROTATION = 180      # Spins display to show correctly on panel
 DISPLAY_WINDOW = 10         # Maximum number of lines of text to display
 SPLASH_TIME = 6             # Maximum number of seconds splashscreen will display
 LOGO_FILE = "/logo.bmp"      # Logo file for splash screen
+
+# Save/Load constants
+MAX_SAVE_SLOTS = 8         # Number of save slots to provide
