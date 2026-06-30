@@ -13,6 +13,7 @@ The eharp is a full-featured MIDI controller that offers the following functions
 - Pitch and Bend controls
 - Sustain pedal input
 - Multi-level menu system
+- Save and Load up to 8 sets of parameters ("songs")
 - Self-calibration to compensate for background light levels
 - Several self-diagnostic features
 
@@ -51,5 +52,12 @@ On top of that, there are some MIDI control events that also need to be emitted,
 - If the Sustain pedal is pressed, a <samp>ControlChange(64)</samp> event is emitted with a parameter of 127 (sustain on).
 - If the Sustain pedal is released, a <samp>ControlChange(64)</samp> event is emitted with a parameter of 0 (sustain off).
 
+### Parameter saving
+The user can save and reload up to 8 sets of parameters for different songs:
+- Scale
+- Velocity
+- MIDI channel
+- Transposition
+- Octave setting
 
 *My thanks also to Adam Metcalf for the original inspiration, as well as much sage advice during the design and build of this project (and not laughing at my terrible electronics!)*
