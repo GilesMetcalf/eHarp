@@ -19,7 +19,7 @@ When selecting one of these option, there are 8 slots labelled Song 1 through to
 Note that selecting to save in a slot that has been used before will overwrite any existing parameters.
 
 ### Scales menu
-There are 32 different scales or modes that can be selected from the **Scales** menu:
+There are 23 different scales or modes that can be selected from the **Scales** menu:
 - Chromatic
 - Major
 - Minor
