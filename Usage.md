@@ -2,7 +2,7 @@
 
 ## IMPORTANT SAFETY NOTE!!!
 This instrument uses lasers. Lots of lasers!
-Although the laser diodes are relatively low power (<5mW), they are still sufficient to cause eye injury if stared into. DO NOT LOOK DIRECTLY INTO THE LASER ARRAY!
+Although the laser diodes are relatively low power (<5mW), they are still sufficient to cause eye injury if stared into. **DO NOT LOOK DIRECTLY INTO THE LASER ARRAY!**
 
 ## The menus
 There are a number of menus available that allow the user to select various settings for playing, as well as giving access to some diagnostic and calibration features.
